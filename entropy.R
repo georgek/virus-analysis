@@ -59,7 +59,7 @@ where animal = "%s" and day = %d;',
 ##             chr <- dbGetQuery(db,sprintf('select position,A,C,G,T,A+C+G+T as cov from pileup
 ## where animal = "%s" and day = %d and chromosome = %d and position >= %d and position <= %d;',
 ##                                          animals[i], days[j], chromids[k], start, end))
-                        chr <- dbGetQuery(db,sprintf('select position,A,C,G,T,A+C+G+T as cov from pileup
+            chr <- dbGetQuery(db,sprintf('select position,A,C,G,T,A+C+G+T as cov from pileup
 where animal = "%s" and day = %d and chromosome = %d;',
                                          animals[i], days[j], chromids[k]))
             probA = chr$A/chr$cov
@@ -68,14 +68,13 @@ where animal = "%s" and day = %d and chromosome = %d;',
             probT = chr$T/chr$cov
             entropies <- sapply(probA, entpart) + sapply(probC, entpart)
                          + sapply(probG, entpart) + sapply(probT, entpart)
-            ymax <- max(ymax,max(entropies))
 
             df <- data.frame(pos=chr$position,ent=entropies,cov=chr$cov)
             df <- df[df$cov > min(threshold,max(df$cov)-1),]
             dat[[k]] <- df
             dat.lab[[k]] <- df[df$ent>0.1,]
+            ymax <- max(ymax,max(df$ent))
         }
-
 
         for (k in 1:length(chromids)) {
             p <- qplot(pos,ent,data=dat[[k]],colour=cov)
