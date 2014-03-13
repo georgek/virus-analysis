@@ -37,7 +37,8 @@ where animal = "%s" and day = %d;',
         print(paste(i, ": ", filename))
         pdf(file=filename, width=10, height=8, paper="a4r", onefile=TRUE)
 
-        dataframes <- list()
+        dat <- list()
+        dat.lab <- list()
         ymax <- 0
 
         for (k in 1:length(chromids)) {
@@ -52,12 +53,15 @@ where animal = "%s" and day = %d and chromosome = %d;',
                          + sapply(probG, entpart) + sapply(probT, entpart)
             ymax <- max(ymax,max(entropies))
 
-            dataframes[[k]] <- data.frame(pos=chr$position,ent=entropies,cov=chr$cov)
+            df <- data.frame(pos=chr$position,ent=entropies,cov=chr$cov)
+            dat[[k]] <- df
+            dat.lab[[k]] <- df[df$ent>0.1,]
         }
 
 
         for (k in 1:length(chromids)) {
-            p <- qplot(pos,ent,data=dataframes[[k]],colour=cov)
+            p <- qplot(pos,ent,data=dat[[k]],colour=cov)
+            p <- p + geom_text(data = dat.lab[[k]], aes(pos,ent, label = pos), hjust = 2,size=3)
             p <- p + labs(title = sprintf("Nucleotide entropy %s %s Day %d", titleAddition, animals[i], days[j]),
                           x = aliases[k], y = "Entropy", colour = "Coverage")
             p <- p + ylim(0,ymax)
