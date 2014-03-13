@@ -71,7 +71,7 @@ where animal = "%s" and day = %d and chromosome = %d;',
             ymax <- max(ymax,max(entropies))
 
             df <- data.frame(pos=chr$position,ent=entropies,cov=chr$cov)
-            df <- df[df$cov > threshold,]
+            df <- df[df$cov > min(threshold,max(df$cov)-1),]
             dat[[k]] <- df
             dat.lab[[k]] <- df[df$ent>0.1,]
         }
