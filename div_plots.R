@@ -6,6 +6,8 @@ output_file_format <- args[2]   # sprintf(args[2],samples$animal[sid], samples$d
 								# "%s_d%d_%s.pdf"
 title_addition <- args[3]
 
+nuc_colours <- c("springgreen", "plum", "slateblue", "seagreen")
+
 # CREATE TABLE chromosomes(name, length);
 # CREATE TABLE chromosome_aliases (name, alias);
 # CREATE TABLE pileup(animal, day, chromosome, position INT, A INT, C INT, G INT, T INT, D INT);
@@ -60,24 +62,32 @@ for (i in 1:dim) {
 	# print(name)
 
     # chr<-subset(sdata,chromosome==name)
-	chr <- dbGetQuery(db,sprintf('select * from div where chromosome = %d and animal = "%s" and day = %d;', refs$chromosome[i], refs$animal[i], refs$day[i]))
+	chr <- dbGetQuery(db,sprintf('select * from div where chromosome = %d and animal = "%s" and day = %d;',
+                                     refs$chromosome[i], refs$animal[i], refs$day[i]))
 	alias <- chr$alias[1]
 
 	tempfilename <- sprintf(args[2],refs$animal[i], refs$day[i], alias)
 		
 	pdf(file=tempfilename,height=8.3, width=((length(chr$position) / 10) + 2.5),onefile = FALSE)
 	print(c(min(c(chr$A,chr$C,chr$G,chr$T)),max(c(chr$A,chr$C,chr$G,chr$T))))
-	barplot(t(matrix(pmax(c(chr$A,chr$C,chr$G,chr$T),0),ncol=4)),ylim=c(min(c(chr$A,chr$C,chr$G,chr$T)),max(c(chr$A,chr$C,chr$G,chr$T))),xlab="Position", ylab="Coverage",main=paste("Diversity in",refs$animal[i],"day", refs$day[i],args[3], sep=" "),sub=alias,names.arg=chr$position,col=c("tan","red","yellow","violet"))
+        par(lty=0)
+	barplot(t(matrix(pmax(c(chr$A,chr$C,chr$G,chr$T),0),ncol=4)),
+                ylim=c(min(c(chr$A,chr$C,chr$G,chr$T)),max(c(chr$A,chr$C,chr$G,chr$T))),
+                xlab="Position",
+                ylab="Coverage",
+                main=paste("Diversity in",refs$animal[i],"day", refs$day[i],args[3], sep=" "),
+                sub=alias,
+                names.arg=chr$position,
+                col=nuc_colours,
+                space=0)
 	
-	barplot(t(matrix(pmin(c(chr$A,chr$C,chr$G,chr$T),0),ncol=4)),col=c("tan","red","yellow","violet"),add=TRUE)
+	barplot(t(matrix(pmin(c(chr$A,chr$C,chr$G,chr$T),0),ncol=4)),col=nuc_colours,add=TRUE)
 	
 	par(xpd=TRUE)
-	legend(x="left",c("A","C","G","T"),fill=c("tan","red","yellow","violet"))
+	legend(x="left",c("A","C","G","T"),fill=nuc_colours)
 	
     # print(paste("STATS",args[1],name, sum(chr$COV),sum(chr$COV)/length(chr$COV), sep="      ") )
 
 	dev.off()
 }
-
-
 
