@@ -6,7 +6,7 @@ outputFileFormat <- args[2]
 titleAddition <- args[3]
 
 entpart <- function(x) {
-    if (x == 0) {
+    if (is.nan(x) || x == 0) {
         0
     } else {
         -x*log(x)
@@ -19,27 +19,51 @@ library("ggplot2")
 
 db <- dbConnect(dbDriver("SQLite"), dbname=databaseFile)
 
-refs <- dbGetQuery(db,"select distinct chromosome, animal, day from pileup;")
-dim <- length(refs$animal)
+animals <- dbGetQuery(db,"select distinct animal from pileup;")$animal
 
-chr <- dbGetQuery(db,sprintf('select alias,position,A,C,G,T,A+C+G+T as cov from pileup
+for (i in 1:length(animals)) {
+
+    days <- dbGetQuery(db,sprintf('select distinct day from pileup where animal = "%s";',animals[i]))$day
+
+    for (j in 1:length(days)) {
+        chromosomes <- dbGetQuery(db,sprintf('select distinct chromosome,alias from pileup
 left join chromosome_aliases on (chromosome = id)
-where chromosome = %d and animal = "%s" and day = %d;',
-                             refs$chromosome[1], refs$animal[1], refs$day[1]))
-alias <- chr$alias[1]
+where animal = "%s" and day = %d;',
+                                             animals[i], days[j]))
+        aliases <- chromosomes$alias
+        chromids <- chromosomes$chromosome
 
-probA = chr$A/chr$cov
-probC = chr$C/chr$cov
-probG = chr$G/chr$cov
-probT = chr$T/chr$cov
-entropies <- sapply(probA, entpart) + sapply(probC, entpart) + sapply(probG, entpart) + sapply(probT, entpart)
+        filename <- sprintf(outputFileFormat, animals[i], days[j])
+        print(paste(i, ": ", filename))
+        pdf(file=filename, width=10, height=8, paper="a4r", onefile=TRUE)
 
-filename <- sprintf(outputFileFormat, refs$animal[1], refs$day[1], alias)
-pdf(file=filename, width=10, height=8, paper="a4r", onefile=FALSE)
+        dataframes <- list()
+        ymax <- 0
 
-df <- data.frame(pos=chr$position,ent=entropies,cov=chr$cov)
-p <- qplot(pos,ent,data=df,colour=cov)
-p + labs(title = sprintf("Nucleotide entropy %s %s Day %d", titleAddition, refs$animal[1], refs$day[1]),
-         x = alias, y = "Entropy", colour = "Coverage")
+        for (k in 1:length(chromids)) {
+            chr <- dbGetQuery(db,sprintf('select position,A,C,G,T,A+C+G+T as cov from pileup
+where animal = "%s" and day = %d and chromosome = %d;',
+                                         animals[i], days[j], chromids[k]))
+            probA = chr$A/chr$cov
+            probC = chr$C/chr$cov
+            probG = chr$G/chr$cov
+            probT = chr$T/chr$cov
+            entropies <- sapply(probA, entpart) + sapply(probC, entpart)
+                         + sapply(probG, entpart) + sapply(probT, entpart)
+            ymax <- max(ymax,max(entropies))
 
-dev.off()
+            dataframes[[k]] <- data.frame(pos=chr$position,ent=entropies,cov=chr$cov)
+        }
+
+
+        for (k in 1:length(chromids)) {
+            p <- qplot(pos,ent,data=dataframes[[k]],colour=cov)
+            p <- p + labs(title = sprintf("Nucleotide entropy %s %s Day %d", titleAddition, animals[i], days[j]),
+                          x = aliases[k], y = "Entropy", colour = "Coverage")
+            p <- p + ylim(0,ymax)
+            print(p)
+        }
+
+        dev.off()
+    }
+}
