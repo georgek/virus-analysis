@@ -1,9 +1,18 @@
+## entropy.R db outputname titleaddition [threshold]
+
+## output name is sprintfed, positions with covereage under threshold are
+## ignored
+
 args <- commandArgs(TRUE)
 args
 
 databaseFile <- args[1]
 outputFileFormat <- args[2]
 titleAddition <- args[3]
+
+if (length(args) > 3) {
+    threshold <- as.integer(args[4])
+}
 
 entpart <- function(x) {
     if (is.nan(x) || x == 0) {
@@ -42,7 +51,15 @@ where animal = "%s" and day = %d;',
         ymax <- 0
 
         for (k in 1:length(chromids)) {
-            chr <- dbGetQuery(db,sprintf('select position,A,C,G,T,A+C+G+T as cov from pileup
+##             limits <- dbGetQuery(db,sprintf('select min(position) as min, max(position) as max from pileup
+## where animal = "%s" and day = %d and chromosome = %d;',
+##                                             animals[i], days[j], chromids[k]))
+            ## start <- limits$min + trimFront
+            ## end <- limits$max - trimEnd
+##             chr <- dbGetQuery(db,sprintf('select position,A,C,G,T,A+C+G+T as cov from pileup
+## where animal = "%s" and day = %d and chromosome = %d and position >= %d and position <= %d;',
+##                                          animals[i], days[j], chromids[k], start, end))
+                        chr <- dbGetQuery(db,sprintf('select position,A,C,G,T,A+C+G+T as cov from pileup
 where animal = "%s" and day = %d and chromosome = %d;',
                                          animals[i], days[j], chromids[k]))
             probA = chr$A/chr$cov
@@ -54,6 +71,7 @@ where animal = "%s" and day = %d and chromosome = %d;',
             ymax <- max(ymax,max(entropies))
 
             df <- data.frame(pos=chr$position,ent=entropies,cov=chr$cov)
+            df <- df[df$cov > threshold,]
             dat[[k]] <- df
             dat.lab[[k]] <- df[df$ent>0.1,]
         }
@@ -61,7 +79,9 @@ where animal = "%s" and day = %d and chromosome = %d;',
 
         for (k in 1:length(chromids)) {
             p <- qplot(pos,ent,data=dat[[k]],colour=cov)
-            p <- p + geom_text(data = dat.lab[[k]], aes(pos,ent, label = pos), hjust = 2,size=3)
+            if (nrow(dat.lab[[k]]) > 0) {
+                p <- p + geom_text(data = dat.lab[[k]], aes(pos,ent, label = pos), hjust = 2,size=3)
+            }
             p <- p + labs(title = sprintf("Nucleotide entropy %s %s Day %d", titleAddition, animals[i], days[j]),
                           x = aliases[k], y = "Entropy", colour = "Coverage")
             p <- p + ylim(0,ymax)
