@@ -1,12 +1,10 @@
 args <- commandArgs(TRUE)
 args
 
-database_filename <- args[1]
-output_file_format <- args[2]   # sprintf(args[2],samples$animal[sid], samples$day[sid], alias)
+databaseFile <- args[1]
+outputFileFormat <- args[2]   # sprintf(args[2],samples$animal[sid], samples$day[sid], alias)
 								# "%s_d%d_%s.pdf"
-title_addition <- args[3]
-
-nuc_colours <- c("springgreen", "plum", "slateblue", "seagreen")
+titleAddition <- args[3]
 
 # CREATE TABLE chromosomes(name, length);
 # CREATE TABLE chromosome_aliases (name, alias);
@@ -23,7 +21,7 @@ library("RSQLite")
 library("reshape2")
 library("ggplot2")
 
-db <- dbConnect(dbDriver("SQLite"), dbname=args[1])
+db <- dbConnect(dbDriver("SQLite"), dbname=databaseFile)
 
 dbSendQuery(db, "create temp table consensus as
 select position, case max(sum(A), sum(C), sum(T), sum(G))
@@ -60,7 +58,7 @@ for (i in 1:dim) {
     alias <- chr$alias[1]
     length <- max(chr$position)
 
-    filename <- sprintf(args[2], animal, day, alias)
+    filename <- sprintf(outputFileFormat, animal, day, alias)
     print(filename)
 
     pdf(file=filename,height=8.3, width=(length / 10),onefile = FALSE)
