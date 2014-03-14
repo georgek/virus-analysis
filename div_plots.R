@@ -20,6 +20,8 @@ if (length(args) > 3) {
 
 library("DBI")
 library("RSQLite")
+library("reshape2")
+library("ggplot2")
 
 db <- dbConnect(dbDriver("SQLite"), dbname=args[1])
 
@@ -46,47 +48,38 @@ join chromosomes on (chromosome = chromosomes.rowid)
 left join chromosome_aliases on (chromosome = id)
 where ", where))
 
-# data
-
-# data$COV = data$A + data$C + data$G + data$T
-
-# max(c(data$A,data$C,data$G,data$T))
-
 refs <- dbGetQuery(db,'select distinct chromosome, animal, day from pileup;')
 
-# refs<-unique(data.frame(name=data$chromosome, alias=data$alias))
-refs
 dim<-length(refs$animal)
 
-for (i in 1:1) {
-    ## print(name)
-
-    ## chr<-subset(sdata,chromosome==name)
+for (i in 1:dim) {
     chr <- dbGetQuery(db,sprintf('select * from div where chromosome = %d and animal = "%s" and day = %d;',
                                  refs$chromosome[i], refs$animal[i], refs$day[i]))
+    animal <- chr$animal[1]
+    day <- chr$day[1]
     alias <- chr$alias[1]
+    length <- max(chr$position)
 
-    tempfilename <- sprintf(args[2],refs$animal[i], refs$day[i], alias)
+    filename <- sprintf(args[2], animal, day, alias)
+    print(filename)
 
-    pdf(file=tempfilename,height=8.3, width=((length(chr$position) / 10) + 2.5),onefile = FALSE)
+    pdf(file=filename,height=8.3, width=(length / 10),onefile = FALSE)
     print(c(min(c(chr$A,chr$C,chr$G,chr$T)),max(c(chr$A,chr$C,chr$G,chr$T))))
-    par(lty=0)
-    barplot(t(matrix(pmax(c(chr$A,chr$C,chr$G,chr$T),0),ncol=4)),
-            ylim=c(min(c(chr$A,chr$C,chr$G,chr$T)),max(c(chr$A,chr$C,chr$G,chr$T))),
-            xlab="Position",
-            ylab="Coverage",
-            main=paste("Diversity in",refs$animal[i],"day", refs$day[i],args[3], sep=" "),
-            sub=alias,
-            names.arg=chr$position,
-            col=nuc_colours,
-            space=0)
 
-    barplot(t(matrix(pmin(c(chr$A,chr$C,chr$G,chr$T),0),ncol=4)),col=nuc_colours,add=TRUE)
+    df = data.frame(pos=chr$position, A=chr$A, C=chr$C, G=chr$G, T=chr$T)
+    ## convert to long form
+    df <- melt(df, id.vars=c("pos"), variable.name="base", value.name="count")
+    df.cov <- subset(df, count >= 0)
+    df.snp <- subset(df, count < 0)
 
-    par(xpd=TRUE)
-    legend(x="left",c("A","C","G","T"),fill=nuc_colours)
-
-    ## print(paste("STATS",args[1],name, sum(chr$COV),sum(chr$COV)/length(chr$COV), sep="      ") )
+    c <- ggplot()
+    c <- c + geom_bar(data=df.cov, aes(x=pos, y=count, fill=base), stat="identity")
+    c <- c + geom_bar(data=df.snp, aes(x=pos, y=count, fill=base), stat="identity")
+    c <- c + scale_x_discrete(expand=c(0, 1))
+    c <- c + labs(title = sprintf("Diversity in %s day %d, %s segment", animal, day, alias),
+                  x = "Position", y = "Coverage", fill = "Base")
+    c <- c + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
+    print(c)
 
     dev.off()
 }
