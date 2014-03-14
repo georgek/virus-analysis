@@ -90,3 +90,5 @@ where animal = "%s" and day = %d and chromosome = %d;',
         dev.off()
     }
 }
+
+dbDisconnect(db)

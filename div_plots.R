@@ -81,3 +81,5 @@ for (i in 1:dim) {
 
     dev.off()
 }
+
+dbDisconnect(db)
