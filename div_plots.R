@@ -46,9 +46,6 @@ join chromosomes on (chromosome = chromosomes.rowid)
 left join chromosome_aliases on (chromosome = id)
 where ", where))
 
-refs <- dbGetQuery(db,'select distinct chromosome, animal, day from pileup;')
-
-dim<-length(refs$animal)
 animals <- dbGetQuery(db,"select distinct animal from pileup;")$animal
 
 for (i in 1:length(animals)) {
