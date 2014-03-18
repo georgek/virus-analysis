@@ -2,9 +2,17 @@ args <- commandArgs(TRUE)
 args
 
 databaseFile <- args[1]
-outputFileFormat <- args[2]   # sprintf(args[2],samples$animal[sid], samples$day[sid], alias)
-								# "%s_d%d_%s.pdf"
+outputFileFormat <- args[2]
 titleAddition <- args[3]
+
+animals <- FALSE
+days <- FALSE
+if (length(args) > 3) {
+    animals <- args[4]
+}
+if (length(args) > 4) {
+    days <- as.integer(args[5])
+}
 
 library("DBI")
 library("RSQLite")
@@ -41,11 +49,15 @@ select protein_id,position,aminoacid,max(count) as count from
  from proteinpileup group by protein_id,position,aminoacid)
 group by protein_id,position;")
 
-animals <- dbGetQuery(db, "select distinct animal from codonpileup;")$animal
+if (animals == FALSE) {
+    animals <- dbGetQuery(db, "select distinct animal from codonpileup;")$animal
+}
 
 for (i in 1:length(animals)) {
 
-    days <- dbGetQuery(db, sprintf('select distinct day from codonpileup where animal = "%s";',animals[i]))$day
+    if (days == FALSE) {
+        days <- dbGetQuery(db, sprintf('select distinct day from codonpileup where animal = "%s";',animals[i]))$day
+    }
 
     for (j in 1:length(days)) {
         proteins <- dbGetQuery(db, sprintf('select distinct protein_id,name from codonpileup

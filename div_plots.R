@@ -2,19 +2,17 @@ args <- commandArgs(TRUE)
 args
 
 databaseFile <- args[1]
-outputFileFormat <- args[2]   # sprintf(args[2],samples$animal[sid], samples$day[sid], alias)
-								# "%s_d%d_%s.pdf"
+outputFileFormat <- args[2]
 titleAddition <- args[3]
 
-# CREATE TABLE chromosomes(name, length);
-# CREATE TABLE chromosome_aliases (name, alias);
-# CREATE TABLE pileup(animal, day, chromosome, position INT, A INT, C INT, G INT, T INT, D INT);
-
-where <- "1"
+animals <- FALSE
+days <- FALSE
 if (length(args) > 3) {
-    where <- paste("1", args[-c(1,2,3)], sep=" AND ", collapse=" AND ")
+    animals <- args[4]
 }
-
+if (length(args) > 4) {
+    days <- as.integer(args[5])
+}
 
 library("DBI")
 library("RSQLite")
@@ -43,14 +41,17 @@ case nuc when 'T' then T else -T end T
 from pileup
 join consensus using (chromosome, position)
 join chromosomes on (chromosome = chromosomes.rowid)
-left join chromosome_aliases on (chromosome = id)
-where ", where))
+left join chromosome_aliases on (chromosome = id)"))
 
-animals <- dbGetQuery(db,"select distinct animal from pileup;")$animal
+if (animals == FALSE) {
+    animals <- dbGetQuery(db,"select distinct animal from pileup;")$animal
+}
 
 for (i in 1:length(animals)) {
 
-    days <- dbGetQuery(db,sprintf('select distinct day from pileup where animal = "%s";',animals[i]))$day
+    if (days == FALSE) {
+        days <- dbGetQuery(db,sprintf('select distinct day from pileup where animal = "%s";',animals[i]))$day
+    }
 
     for (j in 1:length(days)) {
         chromosomes <- dbGetQuery(db,sprintf('select distinct chromosome,alias from pileup
@@ -65,6 +66,7 @@ where animal = "%s" and day = %d;',
 
         ## set up data frames
         for (k in 1:length(chromids)) {
+            print(sprintf("Animal: %s, day: %d, protein: %s", animals[i], days[j], aliases[k]))
             chr <- dbGetQuery(db, sprintf('select position,A,C,G,T from div
 where animal = "%s" and day = %d and chromosome = %d;',
                                           animals[i], days[j], chromids[k]))
