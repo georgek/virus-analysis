@@ -70,7 +70,7 @@ where animal = "%s" and day = %d;',
 
         ## set up data frames
         for (k in 1:length(chromids)) {
-            print(sprintf("Animal: %s, day: %d, protein: %s", animals[i], days[j], aliases[k]))
+            print(sprintf("Animal: %s, day: %d, segment: %s", animals[i], days[j], aliases[k]))
             chr <- dbGetQuery(db, sprintf('select position,Af,Ar,Cf,Cr,Gf,Gr,Tf,Tr from div
 where animal = "%s" and day = %d and chromosome = %d;',
                                           animals[i], days[j], chromids[k]))
