@@ -1,2 +1,4 @@
 *.pdf
 /.Rhistory
+/bam2db.s
+/bam2db
