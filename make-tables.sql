@@ -23,3 +23,6 @@ create index pileup_animal_chromosome_position on pileup (animal,chromosome,posi
 create index pileup_animal_chromosome on pileup (animal,chromosome);
 create index pileup_animal on pileup (animal);
 
+create view pileupnd as
+select animal, day, chromosome, position, Af+Ar as A, Cf+Cr as C, Gf+Gr as G, Tf+Tr as T, D from pileup;
+
