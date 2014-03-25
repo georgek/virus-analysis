@@ -28,12 +28,12 @@ select position, case max(sum(Af)+sum(Ar), sum(Cf)+sum(Cr), sum(Tf)+sum(Tr), sum
 	WHEN sum(Gf)+sum(Gr) then 'G'
 	WHEN sum(Tf)+sum(Tr) then 'T'
 	END nuc, chromosome
-from pileupdir
+from pileup
 group by chromosome, position;
 ");
 
 dbGetQuery(db, paste("create temp view div as
-select chromosome, alias, animal, day, position, 
+select animal, day, chromosome, position,
 case nuc when 'A' then Af else -Af end Af,
 case nuc when 'C' then Cf else -Cf end Cf,
 case nuc when 'G' then Gf else -Gf end Gf,
@@ -42,38 +42,33 @@ case nuc when 'A' then Ar else -Ar end Ar,
 case nuc when 'C' then Cr else -Cr end Cr,
 case nuc when 'G' then Gr else -Gr end Gr,
 case nuc when 'T' then Tr else -Tr end Tr
-from pileupdir
-join consensus using (chromosome, position)
-join chromosomes on (chromosome = chromosomes.rowid)
-left join chromosome_aliases on (chromosome = id)"))
+from pileup as p
+join consensus using (chromosome, position)"))
 
 if (animals == FALSE) {
-    animals <- dbGetQuery(db,"select distinct animal from pileupdir;")$animal
+    animals <- dbGetQuery(db,"select id,name from animals;")
 }
 
-for (i in 1:length(animals)) {
+for (i in 1:length(animals$id)) {
 
     if (days == FALSE) {
-        days <- dbGetQuery(db,sprintf('select distinct day from pileupdir where animal = "%s";',animals[i]))$day
+        days <- dbGetQuery(db,sprintf('select distinct day from pileup where animal = %d;', animals$id[i]))$day
     }
 
     for (j in 1:length(days)) {
-        chromosomes <- dbGetQuery(db,sprintf('select distinct chromosome,alias from pileupdir
-left join chromosome_aliases on (chromosome = id)
-where animal = "%s" and day = %d;',
-                                             animals[i], days[j]))
-        aliases <- chromosomes$alias
-        chromids <- chromosomes$chromosome
+        chromosomes <- dbGetQuery(db,sprintf('select id,name from chromosomes;', animals$id[i], days[j]))
+        aliases <- chromosomes$name
+        chromids <- chromosomes$id
         dat.cov <- list()
         dat.snp <- list()
         lengths <- list()
 
         ## set up data frames
         for (k in 1:length(chromids)) {
-            print(sprintf("Animal: %s, day: %d, segment: %s", animals[i], days[j], aliases[k]))
+            print(sprintf("Animal: %s, day: %d, segment: %s", animals$name[i], days[j], aliases[k]))
             chr <- dbGetQuery(db, sprintf('select position,Af,Ar,Cf,Cr,Gf,Gr,Tf,Tr from div
-where animal = "%s" and day = %d and chromosome = %d;',
-                                          animals[i], days[j], chromids[k]))
+where animal = %d and day = %d and chromosome = %d;',
+                                          animals$id[i], days[j], chromids[k]))
 
             df = data.frame(pos=chr$position, Af=chr$Af, Cf=chr$Cf, Gf=chr$Gf, Tf=chr$Tf,
                                               Ar=chr$Ar, Cr=chr$Cr, Gr=chr$Gr, Tr=chr$Tr)
@@ -86,7 +81,7 @@ where animal = "%s" and day = %d and chromosome = %d;',
 
         ## set up PDF
         maxlength <- max(unlist(lengths))
-        filename <- sprintf(outputFileFormat, animals[i], days[j])
+        filename <- sprintf(outputFileFormat, animals$name[i], days[j])
         print(filename)
         pdf(file=filename, height=8.3, width=(maxlength / 10), onefile=TRUE)
 
@@ -96,13 +91,14 @@ where animal = "%s" and day = %d and chromosome = %d;',
             c <- c + geom_bar(data=dat.cov[[k]], aes(x=pos, y=count, fill=base), stat="identity")
             c <- c + geom_bar(data=dat.snp[[k]], aes(x=pos, y=count, fill=base), stat="identity")
             c <- c + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]])/2 + 1))
-            c <- c + labs(title = sprintf("Diversity in %s day %d, %s segment", animals[i], days[j], aliases[k]),
+            c <- c + labs(title = sprintf("Diversity in %s day %d, %s segment", animals$name[i], days[j], aliases[k]),
                           x = "Position", y = "Coverage", fill = "Base")
             c <- c + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
             suppressWarnings(print(c))  # ggplot warns about negative bars, but it's ok
         }
         dev.off()
     }
+    days <- FALSE
 }
 
 dbDisconnect(db)
