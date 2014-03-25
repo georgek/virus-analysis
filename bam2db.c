@@ -11,7 +11,7 @@
 #define PILEUP_CREATE "create table if not exists pileup_temp(animal, day int, \
 chromosome int, position int,\
 Af int, Cf int, Gf int, Tf int, \
-Ar int, Cr int, Gr int, Tr int, intD int)"
+Ar int, Cr int, Gr int, Tr int, D int)"
 
 #define TO_NEXT_TAB while (getchar() != '\t')
 #define TO_NEXT_NL while (getchar() != '\n')
