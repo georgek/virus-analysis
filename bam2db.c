@@ -20,9 +20,10 @@ static sqlite3 *db = NULL;
 static sqlite3_stmt *stmt;
 static char* dbname, *animal;
 static int day;
-static int chr_l = 21;
-static char chr[21];
+#define chr_l 30
+static char chr[chr_l+1];
 static int nerrors = 0, maxerrors = 10;
+static int nwarns = 0, maxwarns = 10;
 
 inline int char2base(char c)
 {
@@ -34,14 +35,18 @@ inline int numberp(char c)
      return c >= '0' && c <= '9';
 }
 
-void parse_string()
+void parse_chr()
 {
      char c;
      int i;
-     for (c = getchar(), i = 0; c != '\t' && i < chr_l-1; c = getchar(), ++i) {
+     for (c = getchar(), i = 0; c != '\t' && i < chr_l; c = getchar(), ++i) {
           chr[i] = c;
      }
      chr[i] = '\0';
+     if (c != '\t' && nwarns < maxwarns) {
+          fprintf(stderr, "Warning, chromosome name truncated to %s.\n", chr);
+          nwarns++;
+     }
      ungetc(c, stdin);
 }
 
@@ -58,12 +63,155 @@ int parse_number()
      return number;
 }
 
+/* statics for parse_pileup_line */
+static unsigned char pileup_c;
+static int position;
+static char ref_base;
+static int nucs[8] = {0};
+static int dels = 0;
+
 /* just reads over indel and ignores it */
-void do_indel(char type)
+void do_indel()
 {
      int length = parse_number();
      for(; length > 0; --length) {
           getchar();
+     }
+}
+
+void do_del()
+{
+     dels++;
+}
+
+void do_quality()
+{
+     getchar();                 /* read over quality */
+}
+
+void do_base()
+{
+     nucs[char2base(pileup_c)]++;
+}
+
+void do_dot()
+{
+     if ('N' == ref_base && nwarns < maxwarns) {
+          fprintf(stderr, "Warning: N ref base and dot\n");
+     }
+     else{
+          nucs[(char2base(ref_base) & 0x3)]++;
+     }
+}
+
+void do_comma()
+{
+     if ('N' == ref_base && nwarns < maxwarns) {
+          fprintf(stderr, "Warning: N ref base and comma\n");
+     }
+     else {
+          nucs[(char2base(ref_base) | 0x4)]++;
+     }
+}
+
+void do_tab()
+{
+     TO_NEXT_NL;
+     ungetc('\n', stdin);
+}
+
+void do_nothing()
+{
+     return;
+}
+
+void insert_row()
+{
+     int res_code;
+
+     sqlite3_bind_text(stmt, 3, chr, strlen(chr), SQLITE_STATIC);
+     sqlite3_bind_int(stmt, 4, position);
+     sqlite3_bind_int(stmt, 5, nucs[char2base('A')]);
+     sqlite3_bind_int(stmt, 6, nucs[char2base('C')]);
+     sqlite3_bind_int(stmt, 7, nucs[char2base('G')]);
+     sqlite3_bind_int(stmt, 8, nucs[char2base('T')]);
+     sqlite3_bind_int(stmt, 9, nucs[char2base('a')]);
+     sqlite3_bind_int(stmt, 10, nucs[char2base('c')]);
+     sqlite3_bind_int(stmt, 11, nucs[char2base('g')]);
+     sqlite3_bind_int(stmt, 12, nucs[char2base('t')]);
+     sqlite3_bind_int(stmt, 13, nucs[char2base('D')]);
+
+     res_code = sqlite3_step(stmt);
+     if (res_code != SQLITE_DONE) {
+          fprintf(stderr, "SQLite3 error: %d!\n", res_code);
+          exit(1);
+     }
+
+     sqlite3_reset(stmt);
+}
+
+typedef void (*Pfun)(void);
+static Pfun fun_table[8] = {do_nothing, /* 0 */
+                            do_indel,   /* 1 */
+                            do_del,     /* 2 */
+                            do_quality, /* 3 */
+                            do_base,    /* 4 */
+                            do_dot,     /* 5 */
+                            do_comma,   /* 6 */
+                            do_tab};    /* 7 */
+
+static unsigned char a2f[256] = {
+  /* 0     1     2     3     4     5     6     7           */
+  /* 8     9     A     B     C     D     E     F           */
+     0,    0,    0,    0,    0,    0,    0,    0,    /* 00 */
+     0,    7,    0,    0,    0,    0,    0,    0,
+     0,    0,    0,    0,    0,    0,    0,    0,    /* 10 */
+     0,    0,    0,    0,    0,    0,    0,    0,
+     0,    0,    0,    0,    0,    0,    0,    0,    /* 20 */
+     0,    0,    2,    1,    6,    1,    5,    0,
+     0,    0,    0,    0,    0,    0,    0,    0,    /* 30 */
+     0,    0,    0,    0,    0,    0,    0,    0,
+     0,    4,    0,    4,    0,    0,    0,    4,    /* 40 */
+     0,    0,    0,    0,    0,    0,    0,    0,
+     0,    0,    0,    0,    4,    0,    0,    0,    /* 50 */
+     0,    0,    0,    0,    0,    0,    3,    0,
+     0,    4,    0,    4,    0,    0,    0,    4,    /* 60 */
+     0,    0,    0,    0,    0,    0,    0,    0,
+     0,    0,    0,    0,    4,    0,    0,    0,    /* 70 */
+     0,    0,    0,    0,    0,    0,    0,    0
+};
+
+void parse_pileup_line()
+{
+     int i;
+     for(i = 0; i < 8; ++i){
+          nucs[i] = 0;
+     }
+     dels = 0;
+
+     parse_chr();
+     TO_NEXT_TAB;
+     position = parse_number();
+     TO_NEXT_TAB;
+     ref_base = getchar();
+     TO_NEXT_TAB;
+     TO_NEXT_TAB;               /* number of pileups */
+
+     /* now read main pileup to tab (qualities follow) */
+     while((pileup_c = getchar()) != '\n') {
+          fun_table[a2f[pileup_c]]();
+     }
+     insert_row();
+}
+
+void parse_pileup()
+{
+     char nextchar;
+     int nlines = 0;
+     while((nextchar = getc(stdin)) != EOF) {
+          nlines++;
+          ungetc(nextchar, stdin);
+          parse_pileup_line();
      }
 }
 
@@ -78,104 +226,6 @@ void do_error(char **errormessage)
                fprintf(stderr, "(Stopping after %d errors.)\n", maxerrors);
                exit(1);
           }
-     }
-}
-
-void insert_row(int position, int (*nucs)[8], int dels)
-{
-     sqlite3_bind_text(stmt, 1, animal, strlen(animal), SQLITE_STATIC);
-     sqlite3_bind_int(stmt, 2, day);
-     sqlite3_bind_text(stmt, 3, chr, strlen(chr), SQLITE_STATIC);
-     sqlite3_bind_int(stmt, 4, position);
-     sqlite3_bind_int(stmt, 5, (*nucs)[char2base('A')]);
-     sqlite3_bind_int(stmt, 6, (*nucs)[char2base('C')]);
-     sqlite3_bind_int(stmt, 7, (*nucs)[char2base('G')]);
-     sqlite3_bind_int(stmt, 8, (*nucs)[char2base('T')]);
-     sqlite3_bind_int(stmt, 9, (*nucs)[char2base('a')]);
-     sqlite3_bind_int(stmt, 10, (*nucs)[char2base('c')]);
-     sqlite3_bind_int(stmt, 11, (*nucs)[char2base('g')]);
-     sqlite3_bind_int(stmt, 12, (*nucs)[char2base('t')]);
-     sqlite3_bind_int(stmt, 13, (*nucs)[char2base('D')]);
-
-     if (sqlite3_step(stmt) != SQLITE_DONE) {
-          fprintf(stderr, "Commit Failed!\n");
-          exit(1);
-     }
-
-     sqlite3_reset(stmt);
-}
-
-void parse_pileup_line()
-{
-     char c;
-     int position;
-     char ref_base;
-     int nucs[8] = {0};
-     int dels = 0;
-
-     parse_string();
-     TO_NEXT_TAB;
-     position = parse_number();
-     TO_NEXT_TAB;
-     ref_base = getchar();
-     TO_NEXT_TAB;
-     TO_NEXT_TAB;               /* number of pileups */
-
-     /* now read main pileup to tab (qualities follow) */
-     while((c = getchar())) {
-          switch (c) {
-          case '^':             /* read over quality */
-               getchar();
-               break;
-          case 'a': case 'A':
-          case 'c': case 'C':
-          case 'g': case 'G':
-          case 't': case 'T':
-               nucs[char2base(c)]++;
-               break;
-          case '.':             /* forward */
-               if ('N' == ref_base) {
-                    fprintf(stderr, "Warning: N ref base and dot\n");
-               }
-               else{
-                    nucs[(char2base(ref_base) & 0x3)]++;
-               }
-               break;
-          case ',':             /* reverse */
-               if ('N' == ref_base) {
-                    fprintf(stderr, "Warning: N ref base and comma\n");
-               }
-               else {
-                    nucs[(char2base(ref_base) | 0x4)]++;
-               }
-               break;
-          case '+': case '-':
-               do_indel(c);
-               break;
-          case '*':
-               dels++;
-               break;
-          case '\t':
-               TO_NEXT_NL;
-               ungetc('\n', stdin);
-               break;
-          case '\n':
-               insert_row(position, &nucs, dels);
-               return;
-          default:
-               break;
-          }
-     }
-}
-
-void parse_pileup()
-{
-     char nextchar;
-     int nlines = 0;
-     while((nextchar = getc(stdin)) != EOF) {
-          nlines++;
-          ungetc(nextchar, stdin);
-          parse_pileup_line();
      }
 }
 
@@ -222,6 +272,10 @@ int main(int argc, char *argv[])
 
      /* init prepared statement */
      sqlite3_prepare_v2(db, sql, strlen(sql), &stmt, NULL);
+
+     /* these are the same for entire transaction */
+     sqlite3_bind_text(stmt, 1, animal, strlen(animal), SQLITE_STATIC);
+     sqlite3_bind_int(stmt, 2, day);
 
      parse_pileup();
 
