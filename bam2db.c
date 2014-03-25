@@ -256,11 +256,7 @@ int main(int argc, char *argv[])
      }
 
      sqlite3_exec(db, PILEUP_CREATE, NULL, NULL, &errormessage);
-     if (errormessage) {
-          printf("SQLite3 error: %s\n", errormessage);
-          sqlite3_free(errormessage);
-          errormessage = NULL;
-     }
+     do_error(&errormessage);
 
      sqlite3_exec(db, "PRAGMA synchronous=OFF", NULL, NULL, &errormessage);
      sqlite3_exec(db, "PRAGMA count_changes=OFF", NULL, NULL, &errormessage);
