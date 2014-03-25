@@ -139,7 +139,7 @@ void insert_row()
      sqlite3_bind_int(stmt, 10, nucs[char2base('c')]);
      sqlite3_bind_int(stmt, 11, nucs[char2base('g')]);
      sqlite3_bind_int(stmt, 12, nucs[char2base('t')]);
-     sqlite3_bind_int(stmt, 13, nucs[char2base('D')]);
+     sqlite3_bind_int(stmt, 13, dels);
 
      res_code = sqlite3_step(stmt);
      if (res_code != SQLITE_DONE) {
