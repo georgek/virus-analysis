@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
      do_error(&errormessage);
 
      sqlite3_exec(db, "PRAGMA synchronous=OFF", NULL, NULL, &errormessage);
-     sqlite3_exec(db, "PRAGMA count_changes=OFF", NULL, NULL, &errormessage);
+     /* sqlite3_exec(db, "PRAGMA count_changes=OFF", NULL, NULL, &errormessage); */
      sqlite3_exec(db, "PRAGMA journal_mode=MEMORY", NULL, NULL, &errormessage);
      sqlite3_exec(db, "PRAGMA temp_store=MEMORY", NULL, NULL, &errormessage);
 
