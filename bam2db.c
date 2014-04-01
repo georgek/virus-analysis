@@ -25,12 +25,12 @@ static char chr[chr_l+1];
 static int nerrors = 0, maxerrors = 10;
 static int nwarns = 0, maxwarns = 10;
 
-inline int char2base(char c)
+static inline int char2base(char c)
 {
      return ((c >> 1) & 0x3) | ((c & 0x20) >> 3);
 }
 
-inline int numberp(char c)
+static inline int numberp(char c)
 {
      return c >= '0' && c <= '9';
 }
