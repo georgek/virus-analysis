@@ -183,10 +183,7 @@ static unsigned char a2f[256] = {
 
 void parse_pileup_line()
 {
-     int i;
-     for(i = 0; i < 8; ++i){
-          nucs[i] = 0;
-     }
+     memset(nucs, 0, sizeof(nucs));
      dels = 0;
 
      parse_chr();
