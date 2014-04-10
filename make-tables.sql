@@ -5,7 +5,7 @@ create table animals(id integer primary key autoincrement, name);
 
 insert into animals(name) select distinct animal from pileup_temp;
 
-create table chromosomes(id integer primary key autoincrement, name, length);
+create table chromosomes(id integer primary key autoincrement, number int, name, length int);
 
 insert into chromosomes(name) select distinct chromosome from pileup_temp;
 
