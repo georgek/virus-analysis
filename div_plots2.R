@@ -5,6 +5,9 @@ databaseFile <- args[1]
 outputFileFormat <- args[2]
 titleAddition <- args[3]
 
+showgc <- FALSE
+windowlength <- 10
+
 animals <- FALSE
 days <- FALSE
 if (length(args) > 3) {
@@ -14,6 +17,18 @@ if (length(args) > 4) {
     days <- as.integer(args[5])
 }
 
+gccontent <- function(a) {
+    (length(a[a=='G']) + length(a[a=='g']) +
+     length(a[a=='C']) + length(a[a=='c'])) /
+         length(a)
+}
+
+## returns windows of length k from a as a matrix with windows in rows
+windows <- function(a, k) {
+    l <- length(a)
+    t(sapply(1:(l-k+1), function(x){a[x:(x+k-1)]}))
+}
+
 library("DBI")
 library("RSQLite")
 library("reshape2")
@@ -21,7 +36,7 @@ library("ggplot2")
 
 db <- dbConnect(dbDriver("SQLite"), dbname=databaseFile)
 
-dbSendQuery(db, "create temp table consensus as
+dbGetQuery(db, "create temp table consensus as
 select position, case max(sum(Af)+sum(Ar), sum(Cf)+sum(Cr), sum(Tf)+sum(Tr), sum(Gf)+sum(Gr))
 	WHEN sum(Af)+sum(Ar) then 'A'
 	WHEN sum(Cf)+sum(Cr) then 'C'
@@ -43,7 +58,8 @@ case nuc when 'C' then Cr else -Cr end Cr,
 case nuc when 'G' then Gr else -Gr end Gr,
 case nuc when 'T' then Tr else -Tr end Tr
 from pileup as p
-join consensus using (chromosome, position)"))
+join consensus using (chromosome, position);
+"))
 
 if (animals == FALSE) {
     animals <- dbGetQuery(db,"select id,name from animals;")
@@ -56,12 +72,15 @@ for (i in 1:length(animals$id)) {
     }
 
     for (j in 1:length(days)) {
-        chromosomes <- dbGetQuery(db,sprintf('select id,name from chromosomes;', animals$id[i], days[j]))
+        chromosomes <- dbGetQuery(db,sprintf('select id,name from chromosomes order by number;',
+                                             animals$id[i], days[j]))
         aliases <- chromosomes$name
         chromids <- chromosomes$id
         dat.cov <- list()
         dat.snp <- list()
+        dat.gc <- list()
         lengths <- list()
+        coverages <- list()
 
         ## set up data frames
         for (k in 1:length(chromids)) {
@@ -77,13 +96,24 @@ where animal = %d and day = %d and chromosome = %d;',
             dat.cov[[k]] <- subset(df, count > 0)
             dat.snp[[k]] <- subset(df, count < 0)
             lengths[[k]] <- max(df$pos) - min(df$pos)
+            coverages[[k]] <- max(chr$Af + chr$Cf + chr$Gf + chr$Tf +
+                                  chr$Ar + chr$Cr + chr$Gr + chr$Tr)
+
+            consensus <- dbGetQuery(db, sprintf('select position,nuc from consensus
+where chromosome = %d;',
+                                                chromids[k]))
+            conswindows <- windows(consensus$nuc, windowlength)
+            gcconts <- apply(conswindows, 1, gccontent)
+            dat.gc[[k]] <- data.frame(pos=consensus$position[1:(length(consensus$position)-windowlength+1)],
+                                      gc=gcconts)
         }
 
         ## set up PDF
         maxlength <- max(unlist(lengths))
+        maxcoverage <- max(unlist(coverages))
         filename <- sprintf(outputFileFormat, animals$name[i], days[j])
         print(filename)
-        pdf(file=filename, height=8.3, width=(maxlength / 10), onefile=TRUE)
+        pdf(file=filename, height=8, width=(maxlength / 10), onefile=TRUE)
 
         ## print plots
         for (k in 1:length(chromids)) {
@@ -91,10 +121,20 @@ where animal = %d and day = %d and chromosome = %d;',
             c <- c + geom_bar(data=dat.cov[[k]], aes(x=pos, y=count, fill=base), stat="identity")
             c <- c + geom_bar(data=dat.snp[[k]], aes(x=pos, y=count, fill=base), stat="identity")
             c <- c + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]])/2 + 1))
+            ## c <- c + expand_limits(y=c(-maxcoverage,maxcoverage))
             c <- c + labs(title = sprintf("Diversity in %s day %d, %s segment", animals$name[i], days[j], aliases[k]),
                           x = "Position", y = "Coverage", fill = "Base")
             c <- c + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
             suppressWarnings(print(c))  # ggplot warns about negative bars, but it's ok
+            if (showgc) {
+                gc <- ggplot()
+                gc <- gc + geom_line(data=dat.gc[[k]], aes(x=pos, y=gc))
+                gc <- gc + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]]-windowlength+1)/2 + 1))
+                gc <- gc + labs(title = sprintf("GC content in %s segment", aliases[k]),
+                                x = "Position", y = "GC content")
+                gc <- gc + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
+                print(gc)
+            }
         }
         dev.off()
     }
