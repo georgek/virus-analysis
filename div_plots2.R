@@ -29,6 +29,12 @@ windows <- function(a, k) {
     t(sapply(1:(l-k+1), function(x){a[x:(x+k-1)]}))
 }
 
+## returns list of n colours equally spaced in HSL, like ggplot default
+gg_color_hue <- function(n) {
+    hues = seq(15, 375, length=n+1)
+    hcl(h=hues, l=65, c=100)[1:n]
+}
+
 library("DBI")
 library("RSQLite")
 library("reshape2")
@@ -56,7 +62,8 @@ case nuc when 'T' then Tf else -Tf end Tf,
 case nuc when 'A' then Ar else -Ar end Ar,
 case nuc when 'C' then Cr else -Cr end Cr,
 case nuc when 'G' then Gr else -Gr end Gr,
-case nuc when 'T' then Tr else -Tr end Tr
+case nuc when 'T' then Tr else -Tr end Tr,
+D
 from pileup as p
 join consensus using (chromosome, position);
 "))
@@ -78,6 +85,7 @@ for (i in 1:length(animals$id)) {
         chromids <- chromosomes$id
         dat.cov <- list()
         dat.snp <- list()
+        dat.del <- list()
         dat.gc <- list()
         lengths <- list()
         coverages <- list()
@@ -85,19 +93,22 @@ for (i in 1:length(animals$id)) {
         ## set up data frames
         for (k in 1:length(chromids)) {
             print(sprintf("Animal: %s, day: %d, segment: %s", animals$name[i], days[j], aliases[k]))
-            chr <- dbGetQuery(db, sprintf('select position,Af,Ar,Cf,Cr,Gf,Gr,Tf,Tr from div
+            chr <- dbGetQuery(db, sprintf('select position,Af,Ar,Cf,Cr,Gf,Gr,Tf,Tr,D from div
 where animal = %d and day = %d and chromosome = %d;',
                                           animals$id[i], days[j], chromids[k]))
 
-            df = data.frame(pos=chr$position, Af=chr$Af, Cf=chr$Cf, Gf=chr$Gf, Tf=chr$Tf,
+            df <- data.frame(pos=chr$position, Af=chr$Af, Cf=chr$Cf, Gf=chr$Gf, Tf=chr$Tf,
                                               Ar=chr$Ar, Cr=chr$Cr, Gr=chr$Gr, Tr=chr$Tr)
+            df.del <- data.frame(pos=chr$position, D=chr$D)
             ## convert to long form
-            df <- melt(df, id.vars=c("pos"), variable.name="base", value.name="count")
-            dat.cov[[k]] <- subset(df, count > 0)
+            df <-     melt(df,     id.vars=c("pos"), variable.name="base", value.name="count")
+            df.del <- melt(df.del, id.vars=c("pos"), variable.name="base", value.name="count")
+            dat.cov[[k]] <- rbind(subset(df, count > 0),df.del)
             dat.snp[[k]] <- subset(df, count < 0)
+            ## dat.del[[k]] <- df.del
             lengths[[k]] <- max(df$pos) - min(df$pos)
             coverages[[k]] <- max(chr$Af + chr$Cf + chr$Gf + chr$Tf +
-                                  chr$Ar + chr$Cr + chr$Gr + chr$Tr)
+                                  chr$Ar + chr$Cr + chr$Gr + chr$Tr + chr$D)
 
             consensus <- dbGetQuery(db, sprintf('select position,nuc from consensus
 where chromosome = %d;',
@@ -117,9 +128,10 @@ where chromosome = %d;',
 
         ## print plots
         for (k in 1:length(chromids)) {
-            c <- ggplot()
+            c <- ggplot() + scale_fill_manual(values=c(gg_color_hue(8),"#444444"))
             c <- c + geom_bar(data=dat.cov[[k]], aes(x=pos, y=count, fill=base), stat="identity")
             c <- c + geom_bar(data=dat.snp[[k]], aes(x=pos, y=count, fill=base), stat="identity")
+            ## c <- c + geom_bar(data=dat.del[[k]], aes(x=pos, y=count), fill="black", stat="identity")
             c <- c + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]])/2 + 1))
             ## c <- c + expand_limits(y=c(-maxcoverage,maxcoverage))
             c <- c + labs(title = sprintf("Diversity in %s day %d, %s segment", animals$name[i], days[j], aliases[k]),
