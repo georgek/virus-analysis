@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <limits.h>
 
-#include <unistd.h>
+#include <getopt.h>
 
 #include <bam/bam.h>
 #include <bam/sam.h>
@@ -78,7 +78,11 @@ static int pileup_func(uint32_t tid, uint32_t pos, int n,
 
 int main(int argc, char *argv[])
 {
-     size_t i;
+     char *progname;
+     int verbose, ggplot;
+
+     size_t i, j;
+     char basenames[] = {'a','c','g','t'};
      char *bamfilename;
      int32_t tid;
 
@@ -89,16 +93,40 @@ int main(int argc, char *argv[])
 
      PosData pos;
 
-     if (argc < 5) {
-          printf("Usage: %s bam_file read_length chromosome_id position\n",
-                 argv[0]);
+     progname = *argv;
+     argv++; argc--;
+     verbose = 0;
+     ggplot = 0;
+     while (argc > 0) {
+          if ('-' == **argv) {
+               switch (*(*argv + 1)) {
+               case 'v':
+                    verbose = 1;
+                    break;
+               case 'g':
+                    ggplot = 1;
+                    break;
+               default:
+                    fprintf(stderr, "Unknown option: %c\n", *(*argv + 1));
+                    break;
+               }
+               argv++; argc--;
+          }
+          else {
+               break;
+          }
+     }
+
+     if (argc < 4) {
+          printf("Usage: %s [-v] bam_file read_length chromosome_id position\n",
+                 progname);
           exit(ARG_ERROR);
      }
      else {
-          bamfilename = argv[1];
-          pos.read_length = strtol(argv[2], NULL, 10);
-          tid = strtol(argv[3], NULL, 10);
-          pos.genome_position = strtol(argv[4], NULL, 10) - 1;
+          bamfilename = argv[0];
+          pos.read_length = strtol(argv[1], NULL, 10);
+          tid = strtol(argv[2], NULL, 10);
+          pos.genome_position = strtol(argv[3], NULL, 10) - 1;
      }
 
      /* try to open bam file */
@@ -113,9 +141,6 @@ int main(int argc, char *argv[])
           fprintf(stderr, "Error opening index for %s\n", bamfilename);
           exit(BAM_ERROR);
      }
-     /* for (i = 0; i < bamin->header->n_targets; ++i) { */
-     /*      printf("%zu : %s\n", i, bamin->header->target_name[i]); */
-     /* } */
      bam_read = bam_init1();
 
      pos.n_reads_f = 0;
@@ -130,23 +155,41 @@ int main(int argc, char *argv[])
                buf, &fetch_func);
      bam_plbuf_push(0, buf);    /* finish pileup */
 
-     printf("Total reads: %zu\n", n_fetched);
-     printf("Proper pairs: %zu\n", n_pushed);
-     printf("Reads forward: %zu, reads reverse: %zu\n",
-            pos.n_reads_f, pos.n_reads_r);
-     printf("%5s %6s %6s %6s %6s %6s %6s %6s %6s\n",
-            "pos", "af", "cf", "gf", "tf", "ar", "cr", "gr", "tr");
-     for (i = 0; i < pos.read_length; ++i) {
-          printf("%5zu %6d %6d %6d %6d %6d %6d %6d %6d\n",
-                 i + 1,
-                 pos.read_positions[i].forward[0],
-                 pos.read_positions[i].forward[1],
-                 pos.read_positions[i].forward[2],
-                 pos.read_positions[i].forward[3],
-                 pos.read_positions[i].reverse[0],
-                 pos.read_positions[i].reverse[1],
-                 pos.read_positions[i].reverse[2],
-                 pos.read_positions[i].reverse[3]);
+     if (verbose) {
+          printf("Total reads: %zu\n", n_fetched);
+          printf("Proper pairs: %zu\n", n_pushed);
+          printf("Reads forward: %zu, reads reverse: %zu\n",
+                 pos.n_reads_f, pos.n_reads_r);
+     }
+
+     if (ggplot) {
+          printf("%5s %5s %6s\n", "pos", "base", "count");
+          for (i = 0; i < pos.read_length; ++i) {
+               for (j = 0; j < 4; ++j) {
+                    printf("%5zu %4cf %6d\n",
+                           i+1, basenames[j], pos.read_positions[i].forward[j]);
+               }
+               for (j = 0; j < 4; ++j) {
+                    printf("%5zu %4cr %6d\n",
+                           i+1, basenames[j], pos.read_positions[i].reverse[j]);
+               }
+          }
+     }
+     else {
+          printf("%5s %6s %6s %6s %6s %6s %6s %6s %6s\n",
+                 "pos", "af", "cf", "gf", "tf", "ar", "cr", "gr", "tr");
+          for (i = 0; i < pos.read_length; ++i) {
+               printf("%5zu %6d %6d %6d %6d %6d %6d %6d %6d\n",
+                      i + 1,
+                      pos.read_positions[i].forward[0],
+                      pos.read_positions[i].forward[1],
+                      pos.read_positions[i].forward[2],
+                      pos.read_positions[i].forward[3],
+                      pos.read_positions[i].reverse[0],
+                      pos.read_positions[i].reverse[1],
+                      pos.read_positions[i].reverse[2],
+                      pos.read_positions[i].reverse[3]);
+          }
      }
 
      bam_plbuf_destroy(buf);
