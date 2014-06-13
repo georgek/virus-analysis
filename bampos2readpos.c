@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
      pos.read_positions = calloc(pos.read_length, sizeof(PosNucs));
 
      buf = bam_plbuf_init(pileup_func, &pos);
-     /* remove maximum pileup depth */
+     /* disable maximum pileup depth */
      bam_plp_set_maxcnt(buf->iter, INT_MAX);
      bam_fetch(bamin->x.bam, bamidx,
                tid, pos.genome_position, pos.genome_position+1,
