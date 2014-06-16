@@ -38,7 +38,7 @@ static int fetch_func(const bam1_t *b, void *data)
 
 /* callback for bam_plbuf_init() */
 static int pileup_func(uint32_t tid, uint32_t pos, int n,
-                       const bam_pileup1_t *pl, void *data) 
+                       const bam_pileup1_t *pl, void *data)
 {
      PosData *p = data;
      int i;
@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
      pos.n_reads_r = 0;
      pos.read_positions = calloc(pos.read_length, sizeof(PosNucs));
 
-     buf = bam_plbuf_init(pileup_func, &pos);
+     buf = bam_plbuf_init(&pileup_func, &pos);
      /* disable maximum pileup depth */
      bam_plp_set_maxcnt(buf->iter, INT_MAX);
      bam_fetch(bamin->x.bam, bamidx,
