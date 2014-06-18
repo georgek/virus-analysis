@@ -11,7 +11,7 @@
 
 #include "errors.h"
 
-static const size_t win_len = 500;
+static const size_t win_len = 1000;
 
 typedef struct pos_nucs {
      sqlite3_int64 forward[4];
