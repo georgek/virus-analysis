@@ -9,12 +9,12 @@ from collections import namedtuple
 import sqlite3
 from Bio import SeqIO
 
-usage = '''Usage: {:s} database_filename sample_sheet genbank_references ...
+usage = "Usage: {:s} database_filename sample_sheet genbank_references..."
 
-A sqlite3 database will be created called database_filename. sample_sheet
+help = """A sqlite3 database will be created called database_filename. sample_sheet
 should be a csv containing the animal names and days and read files.
 genbank_references should be references in genbank format, the filename of
-each is the name of the chromosome/segment.'''
+each is the name of the chromosome/segment."""
 
 Segment = namedtuple("Segment", ['name','genbank'])
 
