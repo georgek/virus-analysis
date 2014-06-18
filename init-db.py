@@ -42,7 +42,7 @@ for gb_file in gb_files:
     except IOError as e:
         exit(e)
     except ValueError as e:
-        print("Not a genbank file: {:s} ({:s})".format(gb_file,e))
+        print("Not a genbank file: {:s} ({:s})".format(gb_file, e))
     finally:
         genbank_file.close()
 
