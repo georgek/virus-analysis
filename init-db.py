@@ -47,11 +47,42 @@ for gb_file in gb_files:
 db = sqlite3.connect(db_file)
 
 c = db.cursor()
-c.execute("create table chromosomes(name unique, length integer);")
-c.execute("create table genes(name unique, product);")
-c.execute("create table cds(chromosome integer, gene integer, start integer, end integer);")
-c.execute("create table animals(name, ndays integer);")
-c.execute("create table read_data(animal integer, day integer, nreads integer, paired integer);")
+c.execute("""CREATE TABLE chromosomes(
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               name TEXT UNIQUE,
+               length INTEGER);""")
+c.execute("""CREATE TABLE genes(
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               name TEXT UNIQUE,
+               product TEXT);""")
+c.execute("""CREATE TABLE cds(
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               chromosome INTEGER,
+               gene INTEGER,
+               start INTEGER,
+               end INTEGER,
+               FOREIGN KEY(chromosome) REFERENCES chromosomes(id),
+               FOREIGN KEY(gene) REFERENCES genes(id));""")
+c.execute("""CREATE TABLE animals(
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               name TEXT UNIQUE,
+               ndays INTEGER);""")
+c.execute("""CREATE TABLE read_data(
+               animal INTEGER,
+               day INTEGER,
+               nreads INTEGER,
+               paired INTEGER,
+               FOREIGN KEY(animal) REFERENCES animals(id));""")
+c.execute("""CREATE TABLE nucleotides(
+               animal INTEGER,
+               day INTEGER,
+               chromosome INTEGER,
+               position INTEGER,
+               Af INTEGER, Cf INTEGER, Gf INTEGER, Tf INTEGER,
+               Ar INTEGER, Cr INTEGER, Gr INTEGER, Tr INTEGER,
+               D INTEGER,
+               FOREIGN KEY(animal) REFERENCES animals(id),
+               FOREIGN KEY(chromosome) REFERENCES chromosomes(id));""")
 db.commit()
 
 animal_ndays = {}
@@ -70,7 +101,7 @@ sample_sheet.close()
 
 animalids = {}
 for animal in animal_ndays:
-    c.execute("insert into animals values(?,?);", 
+    c.execute("INSERT INTO animals(name,ndays) VALUES(?,?);",
               (animal, animal_ndays[animal]))
     animalids[animal] = c.lastrowid
 
@@ -114,7 +145,7 @@ sample_sheet.close()
 genes = {}
 for segment in segments:
     # print("{:s} = {:d}bp".format(segment.name, len(segment.genbank.seq)))
-    c.execute("insert into chromosomes values(?, ?);", 
+    c.execute("INSERT INTO chromosomes(name, length) VALUES(?, ?);",
               (segment.name, len(segment.genbank.seq)))
     chrid = c.lastrowid
     for feature in segment.genbank.features:
@@ -124,13 +155,13 @@ for segment in segments:
             if gene in genes:
                 geneid = genes[gene]
             else:
-                c.execute("insert into genes values(?, ?);", (gene, product))
+                c.execute("INSERT INTO genes(name, product) VALUES(?, ?);", (gene, product))
                 geneid = c.lastrowid
                 genes[gene] = geneid
             location = feature.location
             for part in location.parts:
                 # print("{:d},{:d},{:s}".format(part.start+1, part.end, gene))
-                c.execute("insert into cds values(?,?,?,?);",
+                c.execute("INSERT INTO cds(chromosome, start, end, gene) VALUES(?,?,?,?);",
                           (chrid, geneid, part.start+1, part.end))
 
 db.commit()
