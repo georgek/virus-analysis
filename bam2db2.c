@@ -26,12 +26,12 @@ char sql_nuc_insert[] = "INSERT INTO nucleotides VALUES(?1, ?2, ?3, "
 
 typedef struct win_data {
      int32_t beg;
-     PosNucs *posarr;
+     PosNucs *nucarrays;
 } WinData;
 
 /* print sqlite error */
 static int nerrors = 0, maxerrors = 10;
-void do_error(char **errormessage)
+void sql_error(char **errormessage)
 {
      if (*errormessage) {
           fprintf(stderr, "SQLite3 error: %s\n", *errormessage);
@@ -40,7 +40,7 @@ void do_error(char **errormessage)
           nerrors++;
           if (nerrors >= maxerrors) {
                fprintf(stderr, "(Stopping after %d errors.)\n", maxerrors);
-               exit(SQLITE_ERROR);
+               exit(SQL_ERROR);
           }
      }
 }
@@ -67,14 +67,14 @@ static int pileup_func(uint32_t tid, uint32_t pos, int n,
      if (win_pos >= 0 && win_pos < win_len) {
           for (i = 0; i < n; ++i) {
                if (pl[i].is_del) {
-                    win->posarr[win_pos].dels++;
+                    win->nucarrays[win_pos].dels++;
                }
                else {
                     if (pl[i].b->core.flag & BAM_FREVERSE) {
-                         nucs = win->posarr[win_pos].reverse;
+                         nucs = win->nucarrays[win_pos].reverse;
                     }
                     else {
-                         nucs = win->posarr[win_pos].forward;
+                         nucs = win->nucarrays[win_pos].forward;
                     }
                     switch(bam1_seqi(bam1_seq(pl[i].b), pl[i].qpos)) {
                     case 1:
@@ -108,15 +108,15 @@ static int window_to_db(sqlite3 *db, sqlite3_stmt *stmt,
      for (i = 0; i < win_len_used; ++i) {
           sqlite3_bind_int64(stmt, 3, chr_id);
           sqlite3_bind_int64(stmt, 4, win->beg + i + 1);
-          sqlite3_bind_int64(stmt, 5, win->posarr[i].forward[0]);
-          sqlite3_bind_int64(stmt, 6, win->posarr[i].forward[1]);
-          sqlite3_bind_int64(stmt, 7, win->posarr[i].forward[2]);
-          sqlite3_bind_int64(stmt, 8, win->posarr[i].forward[3]);
-          sqlite3_bind_int64(stmt, 9, win->posarr[i].reverse[0]);
-          sqlite3_bind_int64(stmt, 10, win->posarr[i].reverse[1]);
-          sqlite3_bind_int64(stmt, 11, win->posarr[i].reverse[2]);
-          sqlite3_bind_int64(stmt, 12, win->posarr[i].reverse[3]);
-          sqlite3_bind_int64(stmt, 13, win->posarr[i].dels);
+          sqlite3_bind_int64(stmt, 5, win->nucarrays[i].forward[0]);
+          sqlite3_bind_int64(stmt, 6, win->nucarrays[i].forward[1]);
+          sqlite3_bind_int64(stmt, 7, win->nucarrays[i].forward[2]);
+          sqlite3_bind_int64(stmt, 8, win->nucarrays[i].forward[3]);
+          sqlite3_bind_int64(stmt, 9, win->nucarrays[i].reverse[0]);
+          sqlite3_bind_int64(stmt, 10, win->nucarrays[i].reverse[1]);
+          sqlite3_bind_int64(stmt, 11, win->nucarrays[i].reverse[2]);
+          sqlite3_bind_int64(stmt, 12, win->nucarrays[i].reverse[3]);
+          sqlite3_bind_int64(stmt, 13, win->nucarrays[i].dels);
 
           res_code = sqlite3_step(stmt);
           if (res_code != SQLITE_DONE) {
@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
      sqlite3_exec(db, "PRAGMA temp_store=MEMORY", NULL, NULL, &errormessage);
      sqlite3_exec(db, "PRAGMA journal_mode=MEMORY", NULL, NULL, &errormessage);
 
-     win.posarr = calloc(win_len, sizeof(PosNucs));
+     win.nucarrays = calloc(win_len, sizeof(PosNucs));
 
      buf = bam_plbuf_init(&pileup_func, &win);
      /* disable maximum pileup depth */
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
      sqlite3_bind_int(stmt, 2, day);
      
      sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &errormessage);
-     do_error(&errormessage);
+     sql_error(&errormessage);
      for (i = 0; i < n_chr; ++i) {
           fprintf(stderr, "%s", bamin->header->target_name[i]);
           for (j = 0; j < bamin->header->target_len[i]; j += win_len) {
@@ -249,16 +249,16 @@ int main(int argc, char *argv[])
                window_to_db(db, stmt,
                             chr_ids[i], bamin->header->target_len[i], &win);
                bam_plbuf_reset(buf);
-               memset(win.posarr, 0, sizeof(PosNucs)*win_len);
+               memset(win.nucarrays, 0, sizeof(PosNucs)*win_len);
                fprintf(stderr, ".");
           }
           fprintf(stderr, "\n");
      }
      sqlite3_exec(db, "COMMIT TRANSACTION;", NULL, NULL, &errormessage);
-     do_error(&errormessage);
+     sql_error(&errormessage);
      sqlite3_finalize(stmt);
 
-     free(win.posarr);
+     free(win.nucarrays);
      bam_index_destroy(bamidx);
      samclose(bamin);
      free(chr_ids);
