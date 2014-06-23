@@ -183,7 +183,7 @@ for segment in segments:
             location = feature.location
             for part in location.parts:
                 # print("{:d},{:d},{:s}".format(part.start+1, part.end, gene))
-                c.execute("INSERT INTO cds(chromosome, start, end, gene) VALUES(?,?,?,?);",
+                c.execute("INSERT INTO cds(chromosome, gene, start, end) VALUES(?,?,?,?);",
                           (chrid, geneid, part.start+1, part.end))
 
 db.commit()
