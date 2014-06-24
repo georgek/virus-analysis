@@ -14,7 +14,8 @@
 
 void help(char* name) {
      fprintf(stderr,
-             "Usage: %s [-p prefix] [-m minumum_length (] [-q phred_min (33)] "
+             "Usage: %s [-p prefix] [-m minumum_length (60)] "
+             "[-q phred_min (33)] [-t q_threshold (2)] "
              "filename [filename_pair]\n",
              name);
      fprintf(stderr,"\nEither filename can be set to - (stdin).\n");
@@ -32,7 +33,7 @@ int main (int argc, char** argv) {
           if (**argv == '-') {
                switch((*argv)[1]) {
                case 'p': prefix = *(++argv); break;
-               case 'm': minlength = strtol(*(++argv), NULL, 10) -2; break;
+               case 'm': minlength = strtol(*(++argv), NULL, 10); break;
                case 'h': help("trim_reads"); exit(0); break;
                case 'q': baseq = strtol(*(++argv), NULL, 10); break;
                case 't': threshold = strtol(*(++argv), NULL, 10); break;
@@ -191,32 +192,32 @@ int main (int argc, char** argv) {
                               break;
                     }
                }
-               if (i1 > minlength && i2 > minlength) {
+               if (i1 >= (minlength-1) && i2 >= (minlength-1)) {
                     lengthcounts[i1]++;
                     lengthcounts[i2]++;
                     fprintf(keptfp1,"%s%s\n%s%s\n",id1,sequence1,qid1,quality1);
                     fprintf(keptfp2,"%s%s\n%s%s\n",id2,sequence2,qid2,quality2);
                     kept+=2;
                } else {
-                    if (i1 > minlength) {
+                    if (i1 >= (minlength-1)) {
                          lengthcounts[i1]++;
                          fprintf(keptfps,"%s%s\n%s%s\n",
                                  id1,sequence1,qid1,quality1);
                          kept++;
                          orphaned++;
-                    } else if (i2 > minlength) {
+                    } else if (i2 >= (minlength-1)) {
                          lengthcounts[i2]++;
                          fprintf(keptfps,"%s%s\n%s%s\n",
                                  id2,sequence2,qid2,quality2);
                          kept++;
                          orphaned++;
                     }
-                    if (i1 <= minlength) {
+                    if (i1 < (minlength-1)) {
                          fprintf(discardedfp,"%s%s%s%s",
                                  id1,sequencecpy1,qid1,qualitycpy1);
                          discarded++;
                     }
-                    if (in2 && i2 <= minlength) {
+                    if (in2 && i2 < (minlength-1)) {
                          fprintf(discardedfp,"%s%s%s%s",
                                  id2,sequencecpy2,qid2,qualitycpy2);
                          discarded++;
