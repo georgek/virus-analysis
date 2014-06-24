@@ -14,7 +14,7 @@
 
 void help(char* name) {
      fprintf(stderr,
-             "Usage: %s [-p prefix] [-m minumum_length] "
+             "Usage: %s [-p prefix] [-m minumum_length (] [-q phred_min (33)] "
              "filename [filename_pair]\n",
              name);
      fprintf(stderr,"\nEither filename can be set to - (stdin).\n");
@@ -24,14 +24,18 @@ int main (int argc, char** argv) {
      char *filename1 = 0;
      char *filename2 = 0;
      char *prefix = 0;
-     int minlength = 60-2;
+     int minlength = 60;
+     char baseq = '!';           /* 33 */
+     char threshold = 2;
 
      for (++argv;*argv;argv++) {
           if (**argv == '-') {
                switch((*argv)[1]) {
                case 'p': prefix = *(++argv); break;
-               case 'm': minlength = atoi(*(++argv)) -2; break;
+               case 'm': minlength = strtol(*(++argv), NULL, 10) -2; break;
                case 'h': help("trim_reads"); exit(0); break;
+               case 'q': baseq = strtol(*(++argv), NULL, 10); break;
+               case 't': threshold = strtol(*(++argv), NULL, 10); break;
                case '-': if (!memcmp((*argv) + 2,"help",4)) {
                          help("trim_reads");
                          exit(0);
@@ -51,6 +55,10 @@ int main (int argc, char** argv) {
                help("trim_reads");
                exit(1);
           }
+     }
+     if (baseq < 33) {
+          fprintf(stderr, "Base quality must be at least 33.\n");
+          exit(1);
      }
 
      FILE *in1,*in2 = 0;
@@ -168,17 +176,17 @@ int main (int argc, char** argv) {
                     memcpy(qualitycpy2,quality2,MAX_SEQLEN);
                }
                for (i1 = strlen(quality1)-1; i1 >= 0; i1--) {
-                    if (quality1[i1] == 'B' || quality1[i1] == '\n' ) {
-                         quality1[i1] = 0;
-                         sequence1[i1] = 0;
+                    if (quality1[i1] <= (baseq + threshold)) { /* '\n' is less than baseq */
+                         quality1[i1] = '\0';
+                         sequence1[i1] = '\0';
                     } else
                          break;
                }
                if (in2) {
                     for (i2 = strlen(quality2)-1; i2 >= 0; i2--) {
-                         if (quality2[i2] == 'B' || quality2[i2] == '\n' ) {
-                              quality2[i2] = 0;
-                              sequence2[i2] = 0;
+                         if (quality2[i2] <= (baseq + threshold)) {
+                              quality2[i2] = '\0';
+                              sequence2[i2] = '\0';
                          } else
                               break;
                     }
