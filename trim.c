@@ -245,13 +245,13 @@ int main (int argc, char** argv) {
 
      while (longest > 0 && !lengthcounts[longest]) longest--;
 
-     long long avglen = 0;
+     double avglen = 0;
      for (i = 1; i < MAX_SEQLEN; i++)
           avglen += lengthcounts[i] * i;
 
      avglen /= kept;
 
-     printf("%s,%ld,%ld,%ld,%ld,%lld,%s\n",
+     printf("%s,%ld,%ld,%ld,%ld,%f,%s\n",
             filename1, kept+discarded,kept,discarded,
             orphaned,avglen, filename2);
 
