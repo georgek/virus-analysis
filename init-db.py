@@ -61,10 +61,13 @@ c.execute("""CREATE TABLE cds(
                id INTEGER PRIMARY KEY AUTOINCREMENT,
                chromosome INTEGER,
                gene INTEGER,
-               start INTEGER,
-               end INTEGER,
                FOREIGN KEY(chromosome) REFERENCES chromosomes(id),
                FOREIGN KEY(gene) REFERENCES genes(id));""")
+c.execute("""CREATE TABLE cds_regions(
+               cds INTEGER,
+               start INTEGER,
+               end INTEGER,
+               FOREIGN KEY(cds) REFERENCES cds(id));""")
 c.execute("""CREATE TABLE animals(
                id INTEGER PRIMARY KEY AUTOINCREMENT,
                name TEXT UNIQUE,
@@ -180,11 +183,14 @@ for segment in segments:
                 c.execute("INSERT INTO genes(name, product) VALUES(?, ?);", (gene, product))
                 geneid = c.lastrowid
                 genes[gene] = geneid
+            c.execute("INSERT INTO cds(chromosome, gene) VALUES(?,?);",
+                      (chrid, geneid))
+            cdsid = c.lastrowid
             location = feature.location
             for part in location.parts:
                 # print("{:d},{:d},{:s}".format(part.start+1, part.end, gene))
-                c.execute("INSERT INTO cds(chromosome, gene, start, end) VALUES(?,?,?,?);",
-                          (chrid, geneid, part.start+1, part.end))
+                c.execute("INSERT INTO cds_regions(cds, start, end) VALUES(?,?,?);",
+                          (cdsid, part.start+1, part.end))
 
 db.commit()
 db.close()
