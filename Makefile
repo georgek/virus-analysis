@@ -1,4 +1,4 @@
-CC = c99
+CC ?= c99
 CFLAGS ?= -pedantic -Wall -O2 -g -I$(HOME)/include -L$(HOME)/lib
 
 all: bam2db bam2db2 trim myccs bam-dr bampos2readpos
