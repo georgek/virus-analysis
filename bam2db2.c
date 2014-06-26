@@ -13,20 +13,70 @@
 
 static const size_t win_len = 1000;
 
+char sql_count_cds[] = "SELECT count(*) FROM cds WHERE chromosome = ?;";
+char sql_select_cds[] = "SELECT id, start, end FROM cds WHERE chromosome = ?;";
+char sql_select_chrid[] = "SELECT id FROM chromosomes WHERE name = ?;";
+char sql_select_animalid[] = "SELECT id FROM animals WHERE name = ?;";
+char sql_nuc_insert[] = "INSERT INTO nucleotides VALUES("
+     "?1, ?2, ?3, "
+     "?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)";
+char sql_codon_insert[] = "INSERT INTO codons VALUES("
+     " ?1, ?2, ?3, ?4,"
+     " ?5, ?6, ?7, ?8, ?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,"
+     "?21,?22,?23,?24,?25,?26,?27,?28,?29,?30,?31,?32,?33,?34,?35,?36,"
+     "?37,?38,?39,?40,?41,?42,?43,?44,?45,?46,?47,?48,?49,?50,?51,?52,"
+     "?53,?54,?55,?56,?57,?58,?59,?60,?61,?62,?63,?64,?65,?66,?67,?68,"
+     "?69);";
+
+/* nucleotide counts for a reference position */
 typedef struct pos_nucs {
      sqlite3_int64 forward[4];
      sqlite3_int64 reverse[4];
      sqlite3_int64 dels;
 } PosNucs;
 
-char sql_select_chrid[] = "SELECT id FROM chromosomes WHERE name = ?;";
-char sql_select_animalid[] = "SELECT id FROM animals WHERE name = ?;";
-char sql_nuc_insert[] = "INSERT INTO nucleotides VALUES(?1, ?2, ?3, "
-     "?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)";
+/* codon counts for a cds position */
+typedef struct pos_cods {
+     sqlite3_int64 codons[4][4][4];
+     sqlite3_int64 dels;
+} PosCods;
 
+/* region in a chromosome that is a cds (beg and end incluive) */
+typedef struct cds_region {
+     sqlite3_int64 id;
+     sqlite3_int64 ref_beg, ref_end;
+} CDSRegion;
+
+typedef struct cds {
+     sqlite_int64 id;
+     sqlite_int64 nregions;
+     CDSRegion *regions;
+} CDS;
+
+typedef struct chromosome {
+     sqlite3_int64 id;
+     sqlite3_int64 ncds;
+     CDS *cds;
+} Chromosome;
+
+/* a bit of a cds that overlaps with the window
+ *
+ * ref_beg,ref_end are the positions in the reference of the leftmost
+ * nucleotide in the codon (first for forward frames, last for reverse)
+ *
+ * cds_beg,cds_end are the positions of the window in cds coordinates */
+typedef struct cds_window {
+     CDS *cds;
+     sqlite3_int64 ref_beg, reg_end;
+     sqlite3_int64 cds_beg, cds_end;
+     PosCods *codarrays;
+} CDSWin;
+
+/* window of reference we are looking at */
 typedef struct win_data {
      int32_t beg;
      PosNucs *nucarrays;
+     CDSWin *regions;
 } WinData;
 
 /* print sqlite error */
