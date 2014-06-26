@@ -45,6 +45,70 @@ void sql_error(char **errormessage)
      }
 }
 
+/* gets chromosome information from database */
+Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
+{
+     int32_t i, j;
+     Chromosome *chromosomes;
+     sqlite3_stmt *id_stmt, *ncds_stmt, *cds_stmt;
+     int res_code;
+
+     chromosomes = malloc(sizeof(Chromosome) * n_chr);
+
+     sqlite3_prepare_v2(db, sql_select_chrid, sizeof(sql_select_chrid),
+                        &id_stmt, NULL);
+     sqlite3_prepare_v2(db, sql_count_cds, sizeof(sql_count_cds),
+                        &ncds_stmt, NULL);
+     sqlite3_prepare_v2(db, sql_select_cds, sizeof(sql_select_cds),
+                        &cds_stmt, NULL);
+
+     for (i = 0; i < n_chr; ++i) {
+          /* id */
+          sqlite3_bind_text(id_stmt, 1, chr_names[i], -1,
+                            SQLITE_STATIC);
+          res_code = sqlite3_step(id_stmt);
+          if (res_code != SQLITE_ROW) {
+               fprintf(stderr, "SQLite3 error: %d!\n", res_code);
+               exit(SQL_ERROR);
+          }
+          chromosomes[i].id = sqlite3_column_int64(id_stmt, 0);
+          sqlite3_reset(id_stmt);
+
+          /* cds */
+          sqlite3_bind_int64(ncds_stmt, 1, chromosomes[i].id);
+          res_code = sqlite3_step(ncds_stmt);
+          if (res_code != SQLITE_ROW) {
+               fprintf(stderr, "SQLite3 error: %d!\n", res_code);
+               exit(SQL_ERROR);
+          }
+          chromosomes[i].ncds = sqlite3_column_int64(ncds_stmt, 0);
+          sqlite3_reset(ncds_stmt);
+
+          chromosomes[i].cds_regions =
+               malloc(sizeof(CDS) * chromosomes[i].ncds);
+          sqlite3_bind_int64(cds_stmt, 1, chromosomes[i].id);
+          for (j = 0; j < chromosomes[i].ncds; ++j) {
+               res_code = sqlite3_step(cds_stmt);
+               if (res_code != SQLITE_ROW) {
+                    fprintf(stderr, "SQLite3 error: %d!\n", res_code);
+                    exit(SQL_ERROR);
+               }
+               chromosomes[i].cds_regions[j].id =
+                                            sqlite3_column_int64(cds_stmt, 0);
+               chromosomes[i].cds_regions[j].ref_beg =
+                                            sqlite3_column_int64(cds_stmt, 1);
+               chromosomes[i].cds_regions[j].ref_end =
+                                            sqlite3_column_int64(cds_stmt, 2);
+          }
+          sqlite3_reset(cds_stmt);
+     }
+
+     sqlite3_finalize(cds_stmt);
+     sqlite3_finalize(ncds_stmt);
+     sqlite3_finalize(id_stmt);
+     return chromosomes;
+}
+
 /* callback for bam_fetch() */
 static int fetch_func(const bam1_t *b, void *data)
 {
@@ -98,7 +162,7 @@ static int pileup_func(uint32_t tid, uint32_t pos, int n,
 }
 
 static int window_to_db(sqlite3 *db, sqlite3_stmt *stmt,
-                        sqlite3_int64 chr_id, uint32_t chr_len, WinData *win) 
+                        uint32_t chr_len, WinData *win)
 {
      int i;
      int res_code;
@@ -106,7 +170,6 @@ static int window_to_db(sqlite3 *db, sqlite3_stmt *stmt,
      win_len_used = win_len_used < win_len ? win_len_used : win_len;
 
      for (i = 0; i < win_len_used; ++i) {
-          sqlite3_bind_int64(stmt, 3, chr_id);
           sqlite3_bind_int64(stmt, 4, win->beg + i + 1);
           sqlite3_bind_int64(stmt, 5, win->nucarrays[i].forward[0]);
           sqlite3_bind_int64(stmt, 6, win->nucarrays[i].forward[1]);
@@ -146,8 +209,8 @@ int main(int argc, char *argv[])
 
      int dbopencode = 0;
      char *errormessage = NULL;
-     int n_chr;
-     sqlite3_int64 *chr_ids = NULL;
+     int32_t n_chr;
+     Chromosome *chromosomes = NULL;
      sqlite3_int64 animal_id;
      int res_code;
 
@@ -189,23 +252,10 @@ int main(int argc, char *argv[])
           exit(BAM_ERROR);
      }
 
-     /* get ids of chromosomes */
+     /* get chromosome info */
      n_chr = bamin->header->n_targets;
-     chr_ids = malloc(sizeof(sqlite3_int64) * n_chr);
-     sqlite3_prepare_v2(db, sql_select_chrid, sizeof(sql_select_chrid),
-                        &stmt, NULL);
-     for (i = 0; i < n_chr; ++i) {
-          sqlite3_bind_text(stmt, 1, bamin->header->target_name[i], -1,
-                            SQLITE_STATIC);
-          res_code = sqlite3_step(stmt);
-          if (res_code != SQLITE_ROW) {
-               fprintf(stderr, "SQLite3 error: %d!\n", res_code);
-               exit(SQL_ERROR);
-          }
-          chr_ids[i] = sqlite3_column_int64(stmt, 0);
-          sqlite3_reset(stmt);
-     }
-     sqlite3_finalize(stmt);
+     chromosomes = get_chromosomes(db, n_chr, bamin->header->target_name);
+
      /* get id of animal */
      sqlite3_prepare_v2(db, sql_select_animalid, sizeof(sql_select_animalid),
                         &stmt, NULL);
@@ -239,15 +289,31 @@ int main(int argc, char *argv[])
      sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &errormessage);
      sql_error(&errormessage);
      for (i = 0; i < n_chr; ++i) {
+          for (j = 0; j < chromosomes[i].ncds; ++j) {
+               printf("   id: %d, beg: %d, end: %d\n",
+                      chromosomes[i].cds_regions[j].id,
+                      chromosomes[i].cds_regions[j].ref_beg,
+                      chromosomes[i].cds_regions[j].ref_end);
+          }
           fprintf(stderr, "%s", bamin->header->target_name[i]);
+          sqlite3_bind_int64(stmt, 3, chromosomes[i].id);
           for (j = 0; j < bamin->header->target_len[i]; j += win_len) {
+               printf("win: %d -- %d\n", j, j + win_len);
+               for (int k = 0; k < chromosomes[i].ncds; ++k) {
+                    if ((chromosomes[i].cds_regions[k].ref_beg >= j
+                         && chromosomes[i].cds_regions[k].ref_beg < (j + win_len))
+                        || (chromosomes[i].cds_regions[k].ref_end >= j
+                            && chromosomes[i].cds_regions[k].ref_beg < (j + win_len))) {
+                         printf("cds id: %d\n", chromosomes[i].cds_regions[k].id);
+                    }
+               }
                win.beg = j;
                bam_fetch(bamin->x.bam, bamidx,
                          i, j, j + win_len,
                          buf, &fetch_func);
                bam_plbuf_push(0, buf);
                window_to_db(db, stmt,
-                            chr_ids[i], bamin->header->target_len[i], &win);
+                            bamin->header->target_len[i], &win);
                bam_plbuf_reset(buf);
                memset(win.nucarrays, 0, sizeof(PosNucs)*win_len);
                fprintf(stderr, ".");
@@ -261,7 +327,7 @@ int main(int argc, char *argv[])
      free(win.nucarrays);
      bam_index_destroy(bamidx);
      samclose(bamin);
-     free(chr_ids);
+     free(chromosomes);
      sqlite3_close(db);
 
      return 0;
