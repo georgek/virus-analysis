@@ -30,6 +30,11 @@ char sql_codon_insert[] = "INSERT INTO codons VALUES("
      "?53,?54,?55,?56,?57,?58,?59,?60,?61,?62,?63,?64,?65,?66,?67,?68,"
      "?69);";
 
+static inline sqlite3_int64 roundu3(sqlite3_int64 x)
+{
+     return (x + (3 - x % 3) % 3);
+}
+
 /* nucleotide counts for a reference position */
 typedef struct pos_nucs {
      sqlite3_int64 forward[4];
@@ -45,12 +50,15 @@ typedef struct pos_cods {
 
 /* region in a chromosome that is a cds (beg and end incluive) */
 typedef struct cds_region {
+     /* real beg and end of region */
      sqlite3_int64 ref_beg, ref_end;
+     /* beg and end of contiguous part of region */
+     sqlite3_int64 ref_beg_cont, ref_end_cont;
 } CDSRegion;
 
 typedef struct cds {
-     sqlite_int64 id;
-     sqlite_int64 nregions;
+     sqlite3_int64 id;
+     sqlite3_int64 nregions;
      CDSRegion *regions;
 } CDS;
 
@@ -67,8 +75,8 @@ typedef struct chromosome {
  *
  * cds_beg,cds_end are the positions of the window in cds coordinates */
 typedef struct cds_window {
-     CDS *cds;
-     sqlite3_int64 ref_beg, reg_end;
+     CDSRegion *cds_region;
+     sqlite3_int64 ref_beg, ref_end;
      sqlite3_int64 cds_beg, cds_end;
      PosCods *codarrays;
 } CDSWin;
@@ -77,6 +85,7 @@ typedef struct cds_window {
 typedef struct win_data {
      int32_t beg;
      PosNucs *nucarrays;
+     sqlite3_int64 nregions;
      CDSWin *regions;
 } WinData;
 
@@ -112,6 +121,7 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
      int32_t i, j, k;
      Chromosome *chromosomes;
      sqlite3_stmt *id_stmt, *ncds_stmt, *cds_stmt, *ncdsr_stmt, *cdsr_stmt;
+     sqlite3_int64 length, remainder;
 
      chromosomes = malloc(sizeof(Chromosome) * n_chr);
 
@@ -155,12 +165,22 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
                chromosomes[i].cds[j].regions =
                     malloc(sizeof(CDSRegion) * chromosomes[i].cds[j].nregions);
                sqlite3_bind_int64(cdsr_stmt, 1, chromosomes[i].cds[j].id);
+               remainder = 0;
                for (k = 0; k < chromosomes[i].cds[j].nregions; ++k) {
                     sqlite3_step_onerow(cdsr_stmt);
                     chromosomes[i].cds[j].regions[k].ref_beg =
                          sqlite3_column_int64(cdsr_stmt, 0);
                     chromosomes[i].cds[j].regions[k].ref_end =
                          sqlite3_column_int64(cdsr_stmt, 1);
+                    chromosomes[i].cds[j].regions[k].ref_beg_cont =
+                         chromosomes[i].cds[j].regions[k].ref_beg +
+                         (3 - remainder)%3;
+                    length = chromosomes[i].cds[j].regions[k].ref_end -
+                         chromosomes[i].cds[j].regions[k].ref_beg_cont + 1;
+                    remainder = length % 3;
+                    chromosomes[i].cds[j].regions[k].ref_end_cont =
+                         chromosomes[i].cds[j].regions[k].ref_beg_cont +
+                         length - remainder - 1;
                }
                sqlite3_reset(cdsr_stmt);
           }
@@ -191,7 +211,7 @@ static int pileup_func(uint32_t tid, uint32_t pos, int n,
 {
      WinData *win = data;
      int win_pos, i;
-     sqlite_int64 *nucs;
+     sqlite3_int64 *nucs;
 
      win_pos = pos - win->beg;
      if (win_pos >= 0 && win_pos < win_len) {
@@ -280,8 +300,13 @@ int main(int argc, char *argv[])
      sqlite3_int64 animal_id;
 
      bam_plbuf_t *buf;
-     size_t i, j;
+     size_t win_beg, win_end;
+     size_t i, j, k;
      WinData win;
+     Chromosome *chr;
+     CDS *cds;
+     CDSRegion *reg;
+     CDSWin *winreg;
 
      if (argc < 5) {
           printf("Usage: %s database bamfile animal day\n", argv[0]);
@@ -349,23 +374,73 @@ int main(int argc, char *argv[])
      
      sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &errormessage);
      sql_error(&errormessage);
-     for (i = 0; i < n_chr; ++i) {
-          for (j = 0; j < chromosomes[i].ncds; ++j) {
-               printf("   id: %d, beg: %d, end: %d\n",
-                      chromosomes[i].cds_regions[j].id,
-                      chromosomes[i].cds_regions[j].ref_beg,
-                      chromosomes[i].cds_regions[j].ref_end);
+     chr = chromosomes;
+     for (i = 0; i < n_chr; i++, chr++) {
+          fprintf(stderr, "%s\n", bamin->header->target_name[i]);
+          cds = chr->cds;
+          for (j = 0; j < chr->ncds; j++, cds++) {
+               printf("   cds id: %d\n",
+                      cds->id);
+               reg = cds->regions;
+               for (k = 0; k < cds->nregions; k++, reg++) {
+                    printf("      region: beg: %d, end: %d\n"
+                           "              bc:  %d, ec:  %d\n",
+                           reg->ref_beg,
+                           reg->ref_end,
+                           reg->ref_beg_cont,
+                           reg->ref_end_cont);
+               }
           }
-          fprintf(stderr, "%s", bamin->header->target_name[i]);
-          sqlite3_bind_int64(stmt, 3, chromosomes[i].id);
-          for (j = 0; j < bamin->header->target_len[i]; j += win_len) {
-               printf("win: %d -- %d\n", j, j + win_len);
-               for (int k = 0; k < chromosomes[i].ncds; ++k) {
-                    if ((chromosomes[i].cds_regions[k].ref_beg >= j
-                         && chromosomes[i].cds_regions[k].ref_beg < (j + win_len))
-                        || (chromosomes[i].cds_regions[k].ref_end >= j
-                            && chromosomes[i].cds_regions[k].ref_beg < (j + win_len))) {
-                         printf("cds id: %d\n", chromosomes[i].cds_regions[k].id);
+          sqlite3_bind_int64(stmt, 3, chr->id);
+          /* do windows */
+          win.nregions = 0;
+          win.regions = NULL;
+          for (win_beg = 0;
+               win_beg < bamin->header->target_len[i];
+               win_beg += win_len) {
+               win_end = win_beg + win_len - 1;
+               /* allocate enough space for all regions */
+               free(win.regions);
+               for (k = 0; k < chr->ncds; ++k) {
+                    win.nregions += chr->cds[k].nregions;
+               }
+               win.regions = malloc(sizeof(CDSWin) * win.nregions);
+               win.nregions = 0;
+               printf("win: %zu -- %lu\n", win_beg, win_beg + win_end);
+               /* calculate actual regions */
+               cds = chr->cds;
+               winreg = win.regions;
+               for (j = 0; j < chr->ncds; j++, cds++) {
+                    reg = cds->regions;
+                    for (k = 0; k < cds->nregions; k++, reg++) {
+                         if (reg->ref_beg_cont <= win_end &&
+                             reg->ref_end_cont >= (win_beg + 2)) {
+                              printf("overlap (%d - %d)\n",
+                                     reg->ref_beg_cont,
+                                     reg->ref_end_cont);
+                              winreg->cds_region = reg;
+                              winreg->ref_beg =
+                                   win_beg > reg->ref_beg_cont ?
+                                   reg->ref_beg_cont + roundu3(win_beg - reg->ref_beg_cont) :
+                                   reg->ref_beg_cont;
+                              winreg->ref_end =
+                                   win_end < reg->ref_end_cont ?
+                                   reg->ref_beg_cont + roundu3(win_end - reg->ref_beg_cont + 1) - 1 :
+                                   reg->ref_end_cont;
+                              winreg->cds_beg =
+                                   win_beg > reg->ref_beg_cont ?
+                                   (winreg->ref_beg - reg->ref_beg_cont)/3 :
+                                   0;
+                              winreg->cds_end =
+                                   win_end < reg->ref_end_cont ?
+                                   (winreg->ref_end - 2 - reg->ref_beg_cont)/3 :
+                                   (reg->ref_end_cont - reg->ref_beg_cont + 1)/3;
+                              winreg->codarrays =
+                                   calloc(winreg->cds_end - winreg->cds_beg + 1,
+                                          sizeof(PosCods));
+                              winreg++;
+                              win.nregions++;
+                         }
                     }
                }
                win.beg = j;
@@ -377,8 +452,15 @@ int main(int argc, char *argv[])
                             bamin->header->target_len[i], &win);
                bam_plbuf_reset(buf);
                memset(win.nucarrays, 0, sizeof(PosNucs)*win_len);
-               fprintf(stderr, ".");
+               /* free codon from window regions */
+               for (j = 0, winreg = win.regions;
+                    j < win.nregions;
+                    j++, winreg++) {
+                    free(winreg->codarrays);
+               }
+               /* fprintf(stderr, "."); */
           }
+          free(win.regions);
           fprintf(stderr, "\n");
      }
      sqlite3_exec(db, "COMMIT TRANSACTION;", NULL, NULL, &errormessage);
