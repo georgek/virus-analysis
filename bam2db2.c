@@ -393,8 +393,10 @@ int main(int argc, char *argv[])
                       cds->id);
                reg = cds->regions;
                for (k = 0; k < cds->nregions; k++, reg++) {
-                    printf("      region: beg: %d, end: %d\n"
+                    printf("      region: strand: %d\n"
+                           "              beg: %d, end: %d\n"
                            "              bc:  %d, ec:  %d\n",
+                           reg->strand,
                            reg->ref_beg,
                            reg->ref_end,
                            reg->ref_beg_cont,
