@@ -205,6 +205,20 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
      return chromosomes;
 }
 
+void free_chromosomes(Chromosome *chromosomes, int32_t n_chr)
+{
+     int i, j;
+     Chromosome *chr;
+     CDS *cds;
+     for (i = 0, chr = chromosomes; i < n_chr; i++, chr++) {
+          for (j = 0, cds = chr->cds; j < chr->ncds; j++, cds++) {
+               free(cds->regions);
+          }
+          free(chr->cds);
+     }
+     free(chromosomes);
+}
+
 /* callback for bam_fetch() */
 static int fetch_func(const bam1_t *b, void *data)
 {
@@ -484,7 +498,7 @@ int main(int argc, char *argv[])
      free(win.nucarrays);
      bam_index_destroy(bamidx);
      samclose(bamin);
-     free(chromosomes);
+     free_chromosomes(chromosomes, n_chr);
      sqlite3_close(db);
 
      return 0;
