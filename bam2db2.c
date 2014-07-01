@@ -384,11 +384,11 @@ int main(int argc, char *argv[])
      
      sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &errormessage);
      sql_error(&errormessage);
-     chr = chromosomes;
-     for (i = 0; i < n_chr; i++, chr++) {
+
+     for (i = 0, chr = chromosomes; i < n_chr; i++, chr++) {
           fprintf(stderr, "%s\n", bamin->header->target_name[i]);
-          cds = chr->cds;
-          for (j = 0; j < chr->ncds; j++, cds++) {
+
+          for (j = 0, cds = chr->cds; j < chr->ncds; j++, cds++) {
                printf("   cds id: %d\n",
                       cds->id);
                reg = cds->regions;
@@ -421,8 +421,9 @@ int main(int argc, char *argv[])
                cds = chr->cds;
                winreg = win.regions;
                for (j = 0; j < chr->ncds; j++, cds++) {
-                    reg = cds->regions;
-                    for (k = 0; k < cds->nregions; k++, reg++) {
+                    for (k = 0, reg = cds->regions;
+                         k < cds->nregions;
+                         k++, reg++) {
                          if (reg->ref_beg_cont <= win_end &&
                              reg->ref_end_cont >= (win_beg + 2)) {
                               printf("overlap (%d - %d)\n",
@@ -431,11 +432,13 @@ int main(int argc, char *argv[])
                               winreg->cds_region = reg;
                               winreg->ref_beg =
                                    win_beg > reg->ref_beg_cont ?
-                                   reg->ref_beg_cont + roundu3(win_beg - reg->ref_beg_cont) :
+                                   reg->ref_beg_cont +
+                                   roundu3(win_beg - reg->ref_beg_cont) :
                                    reg->ref_beg_cont;
                               winreg->ref_end =
                                    win_end < reg->ref_end_cont ?
-                                   reg->ref_beg_cont + roundu3(win_end - reg->ref_beg_cont + 1) - 1 :
+                                   reg->ref_beg_cont +
+                                   roundu3(win_end - reg->ref_beg_cont + 1) - 1 :
                                    reg->ref_end_cont;
                               winreg->cds_beg =
                                    win_beg > reg->ref_beg_cont ?
