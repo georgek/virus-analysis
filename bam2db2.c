@@ -404,6 +404,7 @@ int main(int argc, char *argv[])
      memerror(win.nucarrays);
 
      buf = bam_plbuf_init(&pileup_func, &win);
+     memerror(buf);
      /* disable maximum pileup depth */
      bam_plp_set_maxcnt(buf->iter, INT_MAX);
 
@@ -515,6 +516,7 @@ int main(int argc, char *argv[])
      sqlite3_finalize(stmt);
 
      free(win.nucarrays);
+     bam_plbuf_destroy(buf);
      bam_index_destroy(bamidx);
      samclose(bamin);
      free_chromosomes(chromosomes, n_chr);
