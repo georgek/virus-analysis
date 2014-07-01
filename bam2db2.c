@@ -410,11 +410,10 @@ int main(int argc, char *argv[])
                win_beg += win_len) {
                win_end = win_beg + win_len - 1;
                /* allocate enough space for all regions */
-               free(win.regions);
                for (k = 0; k < chr->ncds; ++k) {
                     win.nregions += chr->cds[k].nregions;
                }
-               win.regions = malloc(sizeof(CDSWin) * win.nregions);
+               win.regions = realloc(win.regions, sizeof(CDSWin) * win.nregions);
                win.nregions = 0;
                printf("win: %zu -- %lu\n", win_beg, win_beg + win_end);
                /* calculate actual regions */
