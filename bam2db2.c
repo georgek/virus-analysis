@@ -31,6 +31,14 @@ char sql_codon_insert[] = "INSERT INTO codons VALUES("
      "?53,?54,?55,?56,?57,?58,?59,?60,?61,?62,?63,?64,?65,?66,?67,?68,"
      "?69);";
 
+void memerror(void *ptr)
+{
+     if (!ptr) {
+          printf("Couldn't allocate memory.\n");
+          exit(MEM_ERROR);
+     }
+}
+
 static inline sqlite3_int64 roundu3(sqlite3_int64 x)
 {
      return (x + (3 - x % 3) % 3);
@@ -130,6 +138,7 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
      CDSRegion *cdsr;
 
      chromosomes = malloc(sizeof(Chromosome) * n_chr);
+     memerror(chromosomes);
 
      sqlite3_prepare_v2(db, sql_select_chrid, sizeof(sql_select_chrid),
                         &id_stmt, NULL);
@@ -156,8 +165,8 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
           chr->ncds = sqlite3_column_int64(ncds_stmt, 0);
           sqlite3_reset(ncds_stmt);
 
-          chr->cds =
-               malloc(sizeof(CDS) * chr->ncds);
+          chr->cds = malloc(sizeof(CDS) * chr->ncds);
+          memerror(chr->cds);
           sqlite3_bind_int64(cds_stmt, 1, chr->id);
           for (j = 0, cds = chr->cds; j < chr->ncds; j++, cds++) {
                sqlite3_step_onerow(cds_stmt);
@@ -168,8 +177,8 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
                cds->nregions = sqlite3_column_int64(ncdsr_stmt, 0);
                sqlite3_reset(ncdsr_stmt);
 
-               cds->regions =
-                    malloc(sizeof(CDSRegion) * cds->nregions);
+               cds->regions = malloc(sizeof(CDSRegion) * cds->nregions);
+               memerror(cds->regions);
                sqlite3_bind_int64(cdsr_stmt, 1, cds->id);
                remainder = 0;
                for (k = 0, cdsr = cds->regions;
@@ -385,6 +394,7 @@ int main(int argc, char *argv[])
      sqlite3_exec(db, "PRAGMA journal_mode=MEMORY", NULL, NULL, &errormessage);
 
      win.nucarrays = calloc(win_len, sizeof(PosNucs));
+     memerror(win.nucarrays);
 
      buf = bam_plbuf_init(&pileup_func, &win);
      /* disable maximum pileup depth */
@@ -430,6 +440,7 @@ int main(int argc, char *argv[])
                     win.nregions += chr->cds[k].nregions;
                }
                win.regions = realloc(win.regions, sizeof(CDSWin) * win.nregions);
+               memerror(win.regions);
                win.nregions = 0;
                printf("win: %zu -- %lu\n", win_beg, win_beg + win_end);
                /* calculate actual regions */
@@ -466,6 +477,7 @@ int main(int argc, char *argv[])
                               winreg->codarrays =
                                    calloc(winreg->cds_end - winreg->cds_beg + 1,
                                           sizeof(PosCods));
+                              memerror(winreg->codarrays);
                               winreg++;
                               win.nregions++;
                          }
