@@ -404,17 +404,17 @@ int main(int argc, char *argv[])
 
           for (j = 0, cds = chr->cds; j < chr->ncds; j++, cds++) {
                printf("   cds id: %d\n",
-                      cds->id);
+                      (int)cds->id);
                reg = cds->regions;
                for (k = 0; k < cds->nregions; k++, reg++) {
                     printf("      region: strand: %d\n"
                            "              beg: %d, end: %d\n"
                            "              bc:  %d, ec:  %d\n",
-                           reg->strand,
-                           reg->ref_beg,
-                           reg->ref_end,
-                           reg->ref_beg_cont,
-                           reg->ref_end_cont);
+                           (int)reg->strand,
+                           (int)reg->ref_beg,
+                           (int)reg->ref_end,
+                           (int)reg->ref_beg_cont,
+                           (int)reg->ref_end_cont);
                }
           }
           sqlite3_bind_int64(stmt, 3, chr->id);
@@ -442,8 +442,8 @@ int main(int argc, char *argv[])
                          if (reg->ref_beg_cont <= win_end &&
                              reg->ref_end_cont >= (win_beg + 2)) {
                               printf("overlap (%d - %d)\n",
-                                     reg->ref_beg_cont,
-                                     reg->ref_end_cont);
+                                     (int)reg->ref_beg_cont,
+                                     (int)reg->ref_end_cont);
                               winreg->cds_region = reg;
                               winreg->ref_beg =
                                    win_beg > reg->ref_beg_cont ?
@@ -486,10 +486,8 @@ int main(int argc, char *argv[])
                     j++, winreg++) {
                     free(winreg->codarrays);
                }
-               /* fprintf(stderr, "."); */
           }
           free(win.regions);
-          fprintf(stderr, "\n");
      }
      sqlite3_exec(db, "COMMIT TRANSACTION;", NULL, NULL, &errormessage);
      sql_error(&errormessage);
