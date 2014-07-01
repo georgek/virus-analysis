@@ -493,9 +493,9 @@ int main(int argc, char *argv[])
                          }
                     }
                }
-               win.beg = j;
+               win.beg = win_beg;
                bam_fetch(bamin->x.bam, bamidx,
-                         i, j, j + win_len,
+                         i, win_beg, win_beg + win_len,
                          buf, &fetch_func);
                bam_plbuf_push(0, buf);
                window_to_db(db, stmt,
