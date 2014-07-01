@@ -65,6 +65,8 @@ c.execute("""CREATE TABLE cds(
                FOREIGN KEY(gene) REFERENCES genes(id));""")
 c.execute("""CREATE TABLE cds_regions(
                cds INTEGER,
+               number INTEGER,
+               strand INTEGER,
                start INTEGER,
                end INTEGER,
                FOREIGN KEY(cds) REFERENCES cds(id));""")
@@ -187,10 +189,12 @@ for segment in segments:
                       (chrid, geneid))
             cdsid = c.lastrowid
             location = feature.location
+            number = 0
             for part in location.parts:
                 # print("{:d},{:d},{:s}".format(part.start+1, part.end, gene))
-                c.execute("INSERT INTO cds_regions(cds, start, end) VALUES(?,?,?);",
-                          (cdsid, part.start+1, part.end))
+                c.execute("INSERT INTO cds_regions(cds, number, strand, start, end) VALUES(?,?,?,?,?);",
+                          (cdsid, number, part.strand, part.start+1, part.end))
+                number += 1
 
 db.commit()
 db.close()
