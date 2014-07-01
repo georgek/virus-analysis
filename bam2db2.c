@@ -15,9 +15,10 @@ static const size_t win_len = 1000;
 
 char sql_count_cds[] = "SELECT count(*) FROM cds WHERE chromosome = ?;";
 char sql_select_cds[] = "SELECT id FROM cds WHERE chromosome = ?;";
-char sql_count_cds_regions[] = "SELECT count(*) FROM cds_regions where cds = ?;";
+char sql_count_cds_regions[] = "SELECT count(*) "
+                               "FROM cds_regions WHERE cds = ?;";
 char sql_select_cds_regions[] = "SELECT start, end, strand "
-                                "FROM cds_regions where cds = ?;";
+                                "FROM cds_regions WHERE cds = ?;";
 char sql_select_chrid[] = "SELECT id FROM chromosomes WHERE name = ?;";
 char sql_select_animalid[] = "SELECT id FROM animals WHERE name = ?;";
 char sql_nuc_insert[] = "INSERT INTO nucleotides VALUES("
@@ -121,7 +122,8 @@ void sqlite3_step_onerow(sqlite3_stmt *stmt)
      int res_code;
      res_code = sqlite3_step(stmt);
      if (res_code != SQLITE_ROW) {
-          fprintf(stderr, "SQLite3 error: %d (%s)\n", res_code, sqlite3_sql(stmt));
+          fprintf(stderr, "SQLite3 error: %d (%s)\n",
+                  res_code, sqlite3_sql(stmt));
           exit(SQL_ERROR);
      }
 }
@@ -140,15 +142,20 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
      chromosomes = malloc(sizeof(Chromosome) * n_chr);
      memerror(chromosomes);
 
-     sqlite3_prepare_v2(db, sql_select_chrid, sizeof(sql_select_chrid),
+     sqlite3_prepare_v2(db, sql_select_chrid,
+                        sizeof(sql_select_chrid),
                         &id_stmt, NULL);
-     sqlite3_prepare_v2(db, sql_count_cds, sizeof(sql_count_cds),
+     sqlite3_prepare_v2(db, sql_count_cds,
+                        sizeof(sql_count_cds),
                         &ncds_stmt, NULL);
-     sqlite3_prepare_v2(db, sql_select_cds, sizeof(sql_select_cds),
+     sqlite3_prepare_v2(db, sql_select_cds,
+                        sizeof(sql_select_cds),
                         &cds_stmt, NULL);
-     sqlite3_prepare_v2(db, sql_count_cds_regions, sizeof(sql_count_cds_regions),
+     sqlite3_prepare_v2(db, sql_count_cds_regions,
+                        sizeof(sql_count_cds_regions),
                         &ncdsr_stmt, NULL);
-     sqlite3_prepare_v2(db, sql_select_cds_regions, sizeof(sql_select_cds_regions),
+     sqlite3_prepare_v2(db, sql_select_cds_regions,
+                        sizeof(sql_select_cds_regions),
                         &cdsr_stmt, NULL);
 
      for (i = 0, chr = chromosomes; i < n_chr; i++, chr++) {
@@ -310,7 +317,7 @@ static int window_to_db(sqlite3 *db, sqlite3_stmt *stmt,
      }
      return 0;
 }
-     
+
 int main(int argc, char *argv[])
 {
      /* char *progname; */
@@ -386,7 +393,7 @@ int main(int argc, char *argv[])
      sqlite3_step_onerow(stmt);
      animal_id = sqlite3_column_int64(stmt, 0);
      sqlite3_finalize(stmt);
-     
+
      /* increases speed of insertion (means if the program crashes the db is */
      /* left invalid) */
      sqlite3_exec(db, "PRAGMA synchronous=OFF", NULL, NULL, &errormessage);
@@ -405,7 +412,7 @@ int main(int argc, char *argv[])
                         &stmt, NULL);
      sqlite3_bind_int64(stmt, 1, animal_id);
      sqlite3_bind_int(stmt, 2, day);
-     
+
      sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, &errormessage);
      sql_error(&errormessage);
 
@@ -439,7 +446,8 @@ int main(int argc, char *argv[])
                for (k = 0; k < chr->ncds; ++k) {
                     win.nregions += chr->cds[k].nregions;
                }
-               win.regions = realloc(win.regions, sizeof(CDSWin) * win.nregions);
+               win.regions = realloc(win.regions,
+                                     sizeof(CDSWin) * win.nregions);
                memerror(win.regions);
                win.nregions = 0;
                printf("win: %zu -- %lu\n", win_beg, win_beg + win_end);
@@ -464,7 +472,7 @@ int main(int argc, char *argv[])
                               winreg->ref_end =
                                    win_end < reg->ref_end_cont ?
                                    reg->ref_beg_cont +
-                                   roundu3(win_end - reg->ref_beg_cont + 1) - 1 :
+                                   roundu3(win_end - reg->ref_beg_cont + 1) - 1:
                                    reg->ref_end_cont;
                               winreg->cds_beg =
                                    win_beg > reg->ref_beg_cont ?
@@ -473,7 +481,8 @@ int main(int argc, char *argv[])
                               winreg->cds_end =
                                    win_end < reg->ref_end_cont ?
                                    (winreg->ref_end - 2 - reg->ref_beg_cont)/3 :
-                                   (reg->ref_end_cont - reg->ref_beg_cont + 1)/3;
+                                   (reg->ref_end_cont -
+                                    reg->ref_beg_cont + 1)/3;
                               winreg->codarrays =
                                    calloc(winreg->cds_end - winreg->cds_beg + 1,
                                           sizeof(PosCods));
