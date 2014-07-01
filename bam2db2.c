@@ -16,7 +16,8 @@ static const size_t win_len = 1000;
 char sql_count_cds[] = "SELECT count(*) FROM cds WHERE chromosome = ?;";
 char sql_select_cds[] = "SELECT id FROM cds WHERE chromosome = ?;";
 char sql_count_cds_regions[] = "SELECT count(*) FROM cds_regions where cds = ?;";
-char sql_select_cds_regions[] = "SELECT start, end FROM cds_regions where cds = ?;";
+char sql_select_cds_regions[] = "SELECT start, end, strand "
+                                "FROM cds_regions where cds = ?;";
 char sql_select_chrid[] = "SELECT id FROM chromosomes WHERE name = ?;";
 char sql_select_animalid[] = "SELECT id FROM animals WHERE name = ?;";
 char sql_nuc_insert[] = "INSERT INTO nucleotides VALUES("
@@ -48,8 +49,10 @@ typedef struct pos_cods {
      sqlite3_int64 dels;
 } PosCods;
 
-/* region in a chromosome that is a cds (beg and end incluive) */
+/* region in a chromosome that is a cds (beg and end inclusive) */
 typedef struct cds_region {
+     /* reverse if -1, forward otherwise */
+     sqlite3_int64 strand;
      /* real beg and end of region */
      sqlite3_int64 ref_beg, ref_end;
      /* beg and end of contiguous part of region */
@@ -177,6 +180,8 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
                          sqlite3_column_int64(cdsr_stmt, 0);
                     cdsr->ref_end =
                          sqlite3_column_int64(cdsr_stmt, 1);
+                    cdsr->strand =
+                         sqlite3_column_int64(cdsr_stmt, 2);
                     cdsr->ref_beg_cont =
                          cdsr->ref_beg +
                          (3 - remainder)%3;
