@@ -122,6 +122,9 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
      Chromosome *chromosomes;
      sqlite3_stmt *id_stmt, *ncds_stmt, *cds_stmt, *ncdsr_stmt, *cdsr_stmt;
      sqlite3_int64 length, remainder;
+     Chromosome *chr;
+     CDS *cds;
+     CDSRegion *cdsr;
 
      chromosomes = malloc(sizeof(Chromosome) * n_chr);
 
@@ -136,50 +139,52 @@ Chromosome *get_chromosomes(sqlite3 *db, int32_t n_chr, char **chr_names)
      sqlite3_prepare_v2(db, sql_select_cds_regions, sizeof(sql_select_cds_regions),
                         &cdsr_stmt, NULL);
 
-     for (i = 0; i < n_chr; ++i) {
+     for (i = 0, chr = chromosomes; i < n_chr; i++, chr++) {
           /* id */
           sqlite3_bind_text(id_stmt, 1, chr_names[i], -1,
                             SQLITE_STATIC);
           sqlite3_step_onerow(id_stmt);
-          chromosomes[i].id = sqlite3_column_int64(id_stmt, 0);
+          chr->id = sqlite3_column_int64(id_stmt, 0);
           sqlite3_reset(id_stmt);
 
           /* cds */
-          sqlite3_bind_int64(ncds_stmt, 1, chromosomes[i].id);
+          sqlite3_bind_int64(ncds_stmt, 1, chr->id);
           sqlite3_step_onerow(ncds_stmt);
-          chromosomes[i].ncds = sqlite3_column_int64(ncds_stmt, 0);
+          chr->ncds = sqlite3_column_int64(ncds_stmt, 0);
           sqlite3_reset(ncds_stmt);
 
-          chromosomes[i].cds =
-               malloc(sizeof(CDS) * chromosomes[i].ncds);
-          sqlite3_bind_int64(cds_stmt, 1, chromosomes[i].id);
-          for (j = 0; j < chromosomes[i].ncds; ++j) {
+          chr->cds =
+               malloc(sizeof(CDS) * chr->ncds);
+          sqlite3_bind_int64(cds_stmt, 1, chr->id);
+          for (j = 0, cds = chr->cds; j < chr->ncds; j++, cds++) {
                sqlite3_step_onerow(cds_stmt);
-               chromosomes[i].cds[j].id = sqlite3_column_int64(cds_stmt, 0);
+               cds->id = sqlite3_column_int64(cds_stmt, 0);
                /* cds regions */
-               sqlite3_bind_int64(ncdsr_stmt, 1, chromosomes[i].cds[j].id);
+               sqlite3_bind_int64(ncdsr_stmt, 1, cds->id);
                sqlite3_step_onerow(ncdsr_stmt);
-               chromosomes[i].cds[j].nregions = sqlite3_column_int64(ncdsr_stmt, 0);
+               cds->nregions = sqlite3_column_int64(ncdsr_stmt, 0);
                sqlite3_reset(ncdsr_stmt);
 
-               chromosomes[i].cds[j].regions =
-                    malloc(sizeof(CDSRegion) * chromosomes[i].cds[j].nregions);
-               sqlite3_bind_int64(cdsr_stmt, 1, chromosomes[i].cds[j].id);
+               cds->regions =
+                    malloc(sizeof(CDSRegion) * cds->nregions);
+               sqlite3_bind_int64(cdsr_stmt, 1, cds->id);
                remainder = 0;
-               for (k = 0; k < chromosomes[i].cds[j].nregions; ++k) {
+               for (k = 0, cdsr = cds->regions;
+                    k < cds->nregions;
+                    k++, cdsr++) {
                     sqlite3_step_onerow(cdsr_stmt);
-                    chromosomes[i].cds[j].regions[k].ref_beg =
+                    cdsr->ref_beg =
                          sqlite3_column_int64(cdsr_stmt, 0);
-                    chromosomes[i].cds[j].regions[k].ref_end =
+                    cdsr->ref_end =
                          sqlite3_column_int64(cdsr_stmt, 1);
-                    chromosomes[i].cds[j].regions[k].ref_beg_cont =
-                         chromosomes[i].cds[j].regions[k].ref_beg +
+                    cdsr->ref_beg_cont =
+                         cdsr->ref_beg +
                          (3 - remainder)%3;
-                    length = chromosomes[i].cds[j].regions[k].ref_end -
-                         chromosomes[i].cds[j].regions[k].ref_beg_cont + 1;
+                    length = cdsr->ref_end -
+                         cdsr->ref_beg_cont + 1;
                     remainder = length % 3;
-                    chromosomes[i].cds[j].regions[k].ref_end_cont =
-                         chromosomes[i].cds[j].regions[k].ref_beg_cont +
+                    cdsr->ref_end_cont =
+                         cdsr->ref_beg_cont +
                          length - remainder - 1;
                }
                sqlite3_reset(cdsr_stmt);
