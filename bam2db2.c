@@ -101,6 +101,66 @@ typedef struct win_data {
      CDSWin *regions;
 } WinData;
 
+static size_t buffer_init_size = 64;
+typedef struct {
+     size_t beg, size;
+     PosNucs *nucs;
+     PosCods *cods;
+} Buffer;
+
+int init_buffer(Buffer *buf)
+{
+     buf->beg = 0;
+     buf->size = buffer_init_size;
+     buf->nucs = calloc(buffer_init_size, sizeof(PosNucs));
+     if (!buf->nucs) {
+          return -1;
+     }
+     buf->cods = calloc(buffer_init_size, sizeof(PosCods));
+     if (!buf->cods) {
+          return -1;
+     }
+     return 0;
+}
+
+void free_buffer(Buffer *buf)
+{
+     buf->beg = 0;
+     buf->size = 0;
+     free(buf->nucs);
+     free(buf->cods);
+}
+
+/* makes buffer at least as big as new_size */
+int resize_buffer(Buffer *buf, size_t new_size)
+{
+     size_t old_size = buf->size, diff;
+     while (buf->size < new_size) {
+          buf->size <<= 2;
+     }
+     buf->nucs = realloc(buf->nucs, buf->size * sizeof(PosNucs));
+     if (!buf->nucs) {
+          return -1;
+     }
+     buf->cods = realloc(buf->cods, buf->size * sizeof(PosNucs));
+     if (!buf->cods) {
+          return -1;
+     }
+     diff = buf->size - old_size;
+     if (diff > 0) {
+          memset(buf->nucs + old_size, 0, diff);
+          /* can use memcpy because max_size is doubled */
+          memcpy(buf->nucs + buf->beg + diff,
+                 buf->nucs + buf->beg, old_size - buf->beg);
+
+          memset(buf->cods + old_size, 0, diff);
+          memcpy(buf->cods + buf->beg + diff,
+                 buf->cods + buf->beg, old_size - buf->beg);
+     }
+
+     return 0;
+}
+
 /* print sqlite error */
 static int nerrors = 0, maxerrors = 10;
 void sql_error(char **errormessage)
@@ -236,56 +296,56 @@ void free_chromosomes(Chromosome *chromosomes, int32_t n_chr)
 }
 
 /* callback for bam_fetch() */
-static int fetch_func(const bam1_t *b, void *data)
-{
-     bam_plbuf_t *buf = data;
-     if (b->core.flag & BAM_FPROPER_PAIR) {
-          bam_plbuf_push(b, buf);
-     }
-     return 0;
-}
+/* static int fetch_func(const bam1_t *b, void *data) */
+/* { */
+/*      bam_plbuf_t *buf = data; */
+/*      if (b->core.flag & BAM_FPROPER_PAIR) { */
+/*           bam_plbuf_push(b, buf); */
+/*      } */
+/*      return 0; */
+/* } */
 
 /* callback for bam_plbuf_init() */
-static int pileup_func(uint32_t tid, uint32_t pos, int n,
-                       const bam_pileup1_t *pl, void *data)
-{
-     WinData *win = data;
-     int win_pos, i;
-     sqlite3_int64 *nucs;
+/* static int pileup_func(uint32_t tid, uint32_t pos, int n, */
+/*                        const bam_pileup1_t *pl, void *data) */
+/* { */
+/*      WinData *win = data; */
+/*      int win_pos, i; */
+/*      sqlite3_int64 *nucs; */
 
-     win_pos = pos - win->beg;
-     if (win_pos >= 0 && win_pos < win_len) {
-          for (i = 0; i < n; ++i) {
-               if (pl[i].is_del) {
-                    win->nucarrays[win_pos].dels++;
-               }
-               else {
-                    if (pl[i].b->core.flag & BAM_FREVERSE) {
-                         nucs = win->nucarrays[win_pos].reverse;
-                    }
-                    else {
-                         nucs = win->nucarrays[win_pos].forward;
-                    }
-                    switch(bam1_seqi(bam1_seq(pl[i].b), pl[i].qpos)) {
-                    case 1:
-                         nucs[0]++;
-                         break;
-                    case 2:
-                         nucs[1]++;
-                         break;
-                    case 4:
-                         nucs[2]++;
-                         break;
-                    case 8:
-                         nucs[3]++;
-                         break;
-                    }
-               }
-          }
-     }
+/*      win_pos = pos - win->beg; */
+/*      if (win_pos >= 0 && win_pos < win_len) { */
+/*           for (i = 0; i < n; ++i) { */
+/*                if (pl[i].is_del) { */
+/*                     win->nucarrays[win_pos].dels++; */
+/*                } */
+/*                else { */
+/*                     if (pl[i].b->core.flag & BAM_FREVERSE) { */
+/*                          nucs = win->nucarrays[win_pos].reverse; */
+/*                     } */
+/*                     else { */
+/*                          nucs = win->nucarrays[win_pos].forward; */
+/*                     } */
+/*                     switch(bam1_seqi(bam1_seq(pl[i].b), pl[i].qpos)) { */
+/*                     case 1: */
+/*                          nucs[0]++; */
+/*                          break; */
+/*                     case 2: */
+/*                          nucs[1]++; */
+/*                          break; */
+/*                     case 4: */
+/*                          nucs[2]++; */
+/*                          break; */
+/*                     case 8: */
+/*                          nucs[3]++; */
+/*                          break; */
+/*                     } */
+/*                } */
+/*           } */
+/*      } */
 
-     return 0;
-}
+/*      return 0; */
+/* } */
 
 static int window_to_db(sqlite3 *db, sqlite3_stmt *stmt,
                         uint32_t chr_len, WinData *win)
@@ -339,7 +399,7 @@ int main(int argc, char *argv[])
      Chromosome *chromosomes = NULL;
      sqlite3_int64 animal_id;
 
-     bam_plbuf_t *buf;
+     /* bam_plbuf_t *buf; */
      size_t win_beg, win_end;
      size_t i, j, k;
      WinData win;
@@ -347,6 +407,9 @@ int main(int argc, char *argv[])
      CDS *cds;
      CDSRegion *reg;
      CDSWin *winreg;
+
+     bam1_t read;
+     memset(&read, 0, sizeof(bam1_t));
 
      if (argc < 5) {
           printf("Usage: %s database bamfile animal day\n", argv[0]);
@@ -403,10 +466,10 @@ int main(int argc, char *argv[])
      win.nucarrays = calloc(win_len, sizeof(PosNucs));
      memerror(win.nucarrays);
 
-     buf = bam_plbuf_init(&pileup_func, &win);
-     memerror(buf);
+     /* buf = bam_plbuf_init(&pileup_func, &win); */
+     /* memerror(buf); */
      /* disable maximum pileup depth */
-     bam_plp_set_maxcnt(buf->iter, INT_MAX);
+     /* bam_plp_set_maxcnt(buf->iter, INT_MAX); */
 
      /* start prepared statement for nucleotide insert */
      sqlite3_prepare_v2(db, sql_nuc_insert, sizeof(sql_nuc_insert),
@@ -451,7 +514,7 @@ int main(int argc, char *argv[])
                                      sizeof(CDSWin) * win.nregions);
                memerror(win.regions);
                win.nregions = 0;
-               printf("win: %zu -- %lu\n", win_beg, win_beg + win_end);
+               printf("win: %zu -- %lu\n", win_beg, win_end);
                /* calculate actual regions */
                cds = chr->cds;
                winreg = win.regions;
@@ -494,13 +557,24 @@ int main(int argc, char *argv[])
                     }
                }
                win.beg = win_beg;
-               bam_fetch(bamin->x.bam, bamidx,
-                         i, win_beg, win_beg + win_len,
-                         buf, &fetch_func);
-               bam_plbuf_push(0, buf);
+
+               /* bam_fetch(bamin->x.bam, bamidx, */
+               /*           i, win_beg, win_beg + win_len, */
+               /*           buf, &fetch_func); */
+               /* bam_plbuf_push(0, buf); */
+
+               /* bam_iter_t iter = bam_iter_query(bamidx, i, win_beg, win_end+1); */
+               /* int c = 0; */
+               /* while (bam_iter_read(bamin->x.bam, iter, &read) > 0) { */
+               /*      c++; */
+               /* } */
+               /* printf("count: %d\n", c); */
+
+               
+
                window_to_db(db, stmt,
                             bamin->header->target_len[i], &win);
-               bam_plbuf_reset(buf);
+               /* bam_plbuf_reset(buf); */
                memset(win.nucarrays, 0, sizeof(PosNucs)*win_len);
                /* free codon from window regions */
                for (j = 0, winreg = win.regions;
@@ -516,7 +590,7 @@ int main(int argc, char *argv[])
      sqlite3_finalize(stmt);
 
      free(win.nucarrays);
-     bam_plbuf_destroy(buf);
+     /* bam_plbuf_destroy(buf); */
      bam_index_destroy(bamidx);
      samclose(bamin);
      free_chromosomes(chromosomes, n_chr);
