@@ -4,6 +4,9 @@
 #include <string.h>
 #include <limits.h>
 
+/* #define NDEBUG */
+#include <assert.h>
+
 #include <sqlite3.h>
 
 #include <bam/sam.h>
@@ -88,20 +91,29 @@ int resize_buffer(Buffer *buf, size_t new_size)
      if (!buf->nucs) {
           return -1;
      }
-     buf->cods = realloc(buf->cods, buf->size * sizeof(PosNucs));
+     buf->cods = realloc(buf->cods, buf->size * sizeof(PosCods));
      if (!buf->cods) {
           return -1;
      }
      diff = buf->size - old_size;
      if (diff > 0) {
-          memset(buf->nucs + old_size, 0, diff);
-          /* can use memcpy because max_size is doubled */
+          assert(diff >= old_size);
+          /* can use memcpy because size is doubled */
+          printf("old_size: %d, beg: %d, diff: %d\n",old_size,buf->beg, diff);
           memcpy(buf->nucs + buf->beg + diff,
-                 buf->nucs + buf->beg, old_size - buf->beg);
-
-          memset(buf->cods + old_size, 0, diff);
+                 buf->nucs + buf->beg,
+                 (old_size - buf->beg)*sizeof(PosNucs));
           memcpy(buf->cods + buf->beg + diff,
-                 buf->cods + buf->beg, old_size - buf->beg);
+                 buf->cods + buf->beg,
+                 (old_size - buf->beg)*sizeof(PosCods));
+          /* zero the new bit */
+          memset(buf->nucs + buf->beg,
+                 0,
+                 diff*sizeof(PosNucs));
+          memset(buf->cods + buf->beg,
+                 0,
+                 diff*sizeof(PosCods));
+          buf->beg += diff;
      }
 
      return 0;
@@ -284,6 +296,7 @@ int main(int argc, char *argv[])
      sql_error(&errormessage);
      sqlite3_finalize(stmt);
 
+     free_buffer(&buf);
      free(db_chrids);
      samclose(samin);
      sqlite3_close(db);
