@@ -119,6 +119,11 @@ int resize_buffer(Buffer *buf, size_t new_size)
      return 0;
 }
 
+int buffer_index(Buffer *buf, int index)
+{
+     return (buf->beg + index)%buf->size;
+}
+
 void buffer_insert_read(Buffer *buf, bam1_t *read)
 {
      
