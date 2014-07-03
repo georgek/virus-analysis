@@ -49,68 +49,10 @@ for gb_file in gb_files:
 db = sqlite3.connect(db_file)
 
 c = db.cursor()
-c.execute("""CREATE TABLE chromosomes(
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               name TEXT UNIQUE,
-               length INTEGER);""")
-c.execute("""CREATE TABLE genes(
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               name TEXT UNIQUE,
-               product TEXT);""")
-c.execute("""CREATE TABLE cds(
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               chromosome INTEGER,
-               gene INTEGER,
-               FOREIGN KEY(chromosome) REFERENCES chromosomes(id),
-               FOREIGN KEY(gene) REFERENCES genes(id));""")
-c.execute("""CREATE TABLE cds_regions(
-               cds INTEGER,
-               number INTEGER,
-               strand INTEGER,
-               start INTEGER,
-               end INTEGER,
-               FOREIGN KEY(cds) REFERENCES cds(id));""")
-c.execute("""CREATE TABLE animals(
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               name TEXT UNIQUE,
-               ndays INTEGER);""")
-c.execute("""CREATE TABLE read_data(
-               animal INTEGER,
-               day INTEGER,
-               nreads INTEGER,
-               paired INTEGER,
-               FOREIGN KEY(animal) REFERENCES animals(id));""")
-c.execute("""CREATE TABLE nucleotides(
-               animal INTEGER,
-               day INTEGER,
-               chromosome INTEGER,
-               position INTEGER,
-               Af INTEGER, Cf INTEGER, Gf INTEGER, Tf INTEGER,
-               Ar INTEGER, Cr INTEGER, Gr INTEGER, Tr INTEGER,
-               D INTEGER,
-               FOREIGN KEY(animal) REFERENCES animals(id),
-               FOREIGN KEY(chromosome) REFERENCES chromosomes(id));""")
-c.execute("""CREATE TABLE codons(
-               animal INTEGER,
-               day INTEGER,
-               cds INTEGER,
-               position INTEGER,
-               AAA INTEGER, AAC INTEGER, AAG INTEGER, AAT INTEGER, ACA INTEGER,
-               ACC INTEGER, ACG INTEGER, ACT INTEGER, AGA INTEGER, AGC INTEGER,
-               AGG INTEGER, AGT INTEGER, ATA INTEGER, ATC INTEGER, ATG INTEGER,
-               ATT INTEGER, CAA INTEGER, CAC INTEGER, CAG INTEGER, CAT INTEGER,
-               CCA INTEGER, CCC INTEGER, CCG INTEGER, CCT INTEGER, CGA INTEGER,
-               CGC INTEGER, CGG INTEGER, CGT INTEGER, CTA INTEGER, CTC INTEGER,
-               CTG INTEGER, CTT INTEGER, GAA INTEGER, GAC INTEGER, GAG INTEGER,
-               GAT INTEGER, GCA INTEGER, GCC INTEGER, GCG INTEGER, GCT INTEGER,
-               GGA INTEGER, GGC INTEGER, GGG INTEGER, GGT INTEGER, GTA INTEGER,
-               GTC INTEGER, GTG INTEGER, GTT INTEGER, TAA INTEGER, TAC INTEGER,
-               TAG INTEGER, TAT INTEGER, TCA INTEGER, TCC INTEGER, TCG INTEGER,
-               TCT INTEGER, TGA INTEGER, TGC INTEGER, TGG INTEGER, TGT INTEGER,
-               TTA INTEGER, TTC INTEGER, TTG INTEGER, TTT INTEGER, Del INTEGER,
-               FOREIGN KEY(animal) REFERENCES animals(id),
-               FOREIGN KEY(cds) REFERENCES cds(id));""")
+schema = open(os.path.dirname(os.path.realpath(__file__))+"/db-schema.sql")
+c.executescript(schema.read())
 db.commit()
+schema.close()
 
 animal_ndays = {}
 ss_line_no = 1
