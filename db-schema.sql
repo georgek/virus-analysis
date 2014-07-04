@@ -72,7 +72,7 @@ CREATE VIEW nucleotides_nd AS
        SELECT animal, day, chromosome, position, 
        Af+Ar AS A, Cf+Cr AS C, Gf+Gr AS G, Tf+Tr AS T, D FROM nucleotides;
 
-CREATE VIEW proteins AS
+CREATE VIEW amino_acids AS
        SELECT animal, day, chromosome, position,
        GCA+GCC+GCG+GCT AS Ala,
        AGA+AGG+CGA+CGC+CGG+CGT AS Arg,
