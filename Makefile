@@ -28,4 +28,4 @@ bampos2readpos: bampos2readpos.c
 	$(CC) $(CFLAGS) -pthread bampos2readpos.c -o bampos2readpos -lbam -lz
 
 clean:
-	rm -f bam2db trim myccs bam-dr
+	rm -f bam2db bam2db2 bam2db3 trim myccs bam-dr bamtest bampos2readpos
