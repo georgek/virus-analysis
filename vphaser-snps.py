@@ -8,11 +8,14 @@ snpsfreq = {}
 for arg in sys.argv[1:]:
     lines = 0
     file = open(arg, 'r')
+    filesnps = {}
     for line in file:
         if line[0] == '#': continue
         lines = lines + 1
         if line.split()[4] != "snp": continue
         pos = int(line.split()[0])
+        if pos in filesnps: continue
+        filesnps[pos] = True
         if pos in snpscount:
             snpscount[pos] = snpscount[pos] + 1
         else:
