@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
      }
 
      if (argc < 4) {
-          printf("Usage: %s [-v] bam_file read_length chromosome_id position\n",
+          printf("Usage: %s [-v] [-g] [-q] bam_file read_length chromosome_id position\n",
                  progname);
           exit(ARG_ERROR);
      }
