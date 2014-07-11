@@ -14,6 +14,8 @@ typedef struct pos_nucs {
      uint32_t reverse[4];
      float qforward[4];
      float qreverse[4];
+     float avg_rl_f[4];
+     float avg_rl_r[4];
 } PosNucs;
 
 typedef struct pos_data {
@@ -45,7 +47,7 @@ static int pileup_func(uint32_t tid, uint32_t pos, int n,
      PosData *p = data;
      int i, j;
      uint32_t *nucs;
-     float *quals;
+     float *quals, *rl;
 
      if (p->genome_position == pos) {
           for (i = 0; i < n; ++i) {
@@ -54,11 +56,13 @@ static int pileup_func(uint32_t tid, uint32_t pos, int n,
                          p->n_reads_r++;
                          nucs = p->read_positions[pl[i].qpos].reverse;
                          quals = p->read_positions[pl[i].qpos].qreverse;
+                         rl = p->read_positions[pl[i].qpos].avg_rl_r;
                     }
                     else {
                          p->n_reads_f++;
                          nucs = p->read_positions[pl[i].qpos].forward;
                          quals = p->read_positions[pl[i].qpos].qforward;
+                         rl = p->read_positions[pl[i].qpos].avg_rl_f;
                     }
                     switch(bam1_seqi(bam1_seq(pl[i].b), pl[i].qpos)) {
                     case 1:
@@ -79,6 +83,8 @@ static int pileup_func(uint32_t tid, uint32_t pos, int n,
                     nucs[j]++;
                     quals[j] *= ((float)nucs[j]-1)/nucs[j];
                     quals[j] += ((float)((char *)bam1_qual(pl[i].b))[j]-33)/nucs[j];
+                    rl[j] *= ((float)nucs[j]-1)/nucs[j];
+                    rl[j] += ((float)pl[i].b->core.l_qseq)/nucs[j];
                }
           }
      }
@@ -177,21 +183,23 @@ int main(int argc, char *argv[])
      }
 
      if (ggplot) {
-          printf("%5s %5s %6s %6s\n", "pos", "base", "count", "qual");
+          printf("%5s %5s %6s %6s %6s\n", "pos", "base", "count", "qual", "avgrl");
           for (i = 0; i < pos.read_length; ++i) {
                for (j = 0; j < 4; ++j) {
-                    printf("%5zu %4cf %6d %6.2f\n",
+                    printf("%5zu %4cf %6d %6.2f %6.2f\n",
                            i+1,
                            basenames[j],
                            pos.read_positions[i].forward[j],
-                           pos.read_positions[i].qforward[j]);
+                           pos.read_positions[i].qforward[j],
+                           pos.read_positions[i].avg_rl_f[j]);
                }
                for (j = 0; j < 4; ++j) {
-                    printf("%5zu %4cr %6d %6.2f\n",
+                    printf("%5zu %4cr %6d %6.2f %6.2f\n",
                            i+1,
                            basenames[j],
                            pos.read_positions[i].reverse[j],
-                           pos.read_positions[i].qreverse[j]);
+                           pos.read_positions[i].qreverse[j],
+                           pos.read_positions[i].avg_rl_r[j]);
                }
           }
      }
