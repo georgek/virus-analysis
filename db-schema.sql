@@ -96,3 +96,28 @@ CREATE VIEW amino_acids AS
        GTA+GTC+GTG+GTT AS Val,
        TAA+TAG+TGA AS STOP
        FROM codons;
+
+CREATE VIEW amino_acids_rev AS
+       SELECT animal, day, chromosome, position+2 AS position,
+       ACG+CCG+GCG+TCG AS Ala,
+       AGA+GGA+AGC+CGC+GGC+TGC AS Arg,
+       CAA+TAA AS Asn,
+       CAG+TAG AS Asp,
+       CGT+TGT AS Cys,
+       AAC+GAC AS Gln,
+       AAG+GAG AS Glu,
+       AGG+CGG+GGG+TGG AS Gly,
+       CAC+TAC AS His,
+       ATA+CTA+TTA AS Ile,
+       ATC+CTC+GTC+TTC+ATT+GTT AS Leu,
+       AAA+GAA AS Lys,
+       GTA AS Met,
+       CTT+TTT AS Phe,
+       ACC+CCC+GCC+TCC AS Pro,
+       CGA+TGA+ACT+CCT+GCT+TCT AS Ser,
+       ACA+CCA+GCA+TCA AS Thr,
+       GGT AS Trp,
+       CAT+TAT AS Tyr,
+       ATG+CTG+GTG+TTG AS Val,
+       AAT+GAT+AGT AS STOP
+       FROM codons;
