@@ -9,12 +9,19 @@ from collections import namedtuple
 import sqlite3
 from Bio import SeqIO
 
-usage = "Usage: {:s} database_filename sample_sheet genbank_references..."
+def pathname(path):
+    name = os.path.dirname(path)
+    if name:
+        return name
+    else:
+        return '.'
+
+usage = "Usage: {:s} database_filename sample_sheet genbank_ref_file"
 
 help = """A sqlite3 database will be created called database_filename. sample_sheet
 should be a csv containing the animal names and days and read files.
-genbank_references should be references in genbank format, the filename of
-each is the name of the chromosome/segment."""
+genbank_ref_file should contain filenames of refs in genbank format, each line
+containing the name of the chromosome/segment and filename."""
 
 Segment = namedtuple("Segment", ['name','genbank'])
 
@@ -24,21 +31,23 @@ if len(sys.argv) < 4:
 else:
     db_file = sys.argv[1]
     ss_file = sys.argv[2]
-    gb_files = sys.argv[3:]
+    gb_file = sys.argv[3]
 
 if os.path.isfile(db_file):
     exit("File {:s} exists!".format(db_file))
 
 try:
     sample_sheet = open(ss_file)
+    gb = open(gb_file)
 except IOError as e:
     exit(e)
 
 segments = []
-for gb_file in gb_files:
+for line in gb:
+    split = line[:-1].split(',')
+    genbank_file = open(pathname(gb_file) + '/' + split[1])
     try:
-        genbank_file = open(gb_file)
-        segments.append(Segment(gb_file, SeqIO.read(genbank_file, 'genbank')))
+        segments.append(Segment(split[0], SeqIO.read(genbank_file, 'genbank')))
     except IOError as e:
         exit(e)
     except ValueError as e:
@@ -46,10 +55,12 @@ for gb_file in gb_files:
     finally:
         genbank_file.close()
 
+gb.close()
+
 db = sqlite3.connect(db_file)
 
 c = db.cursor()
-schema = open(os.path.dirname(os.path.realpath(__file__))+"/db-schema.sql")
+schema = open(pathname(os.path.realpath(__file__))+"/db-schema.sql")
 c.executescript(schema.read())
 db.commit()
 schema.close()
