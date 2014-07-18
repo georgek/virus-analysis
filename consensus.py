@@ -8,6 +8,22 @@ import argparse
 from collections import namedtuple
 import sqlite3
 
+sql_protein_table = """CREATE TEMP TABLE protein AS
+SELECT animal, day, (position-:start)/3+1 AS pos,
+Ala,Arg,Asn,Asp,Cys,Gln,Glu,Gly,His,Ile,
+Leu,Lys,Met,Phe,Pro,Ser,Thr,Trp,Tyr,Val,STOP
+FROM amino_acids WHERE chromosome = :chrid AND position >= :start AND
+position <= :end AND (position-:start)%3 = 0
+ORDER BY pos ASC;"""
+
+sql_protein_table_rev = """CREATE TEMP TABLE protein AS
+SELECT animal, day, (:start-position)/3+1 AS pos,
+Ala,Arg,Asn,Asp,Cys,Gln,Glu,Gly,His,Ile,
+Leu,Lys,Met,Phe,Pro,Ser,Thr,Trp,Tyr,Val,STOP
+FROM amino_acids_rev WHERE chromosome = :chrid AND position >= :start AND
+position <= :end AND (:start-position)%3 = 0
+ORDER BY pos ASC;"""
+
 def fasta(name, seq):
     "Formats the name and sequence as a fasta record."
     lines = [seq[i:i+80] for i in range(0, len(seq), 80)]
@@ -38,11 +54,14 @@ def prot_consensus(animalid, day, geneid):
     carry = 0
     seq = ""
     for cds_region in cds_regions:
-        real_start = cds_region["start"] + carry
-        c.execute("create temp table protein as select animal, day, (position-:start)/3+1 as pos,"
-                  "Ala,Arg,Asn,Asp,Cys,Gln,Glu,Gly,His,Ile,Leu,Lys,Met,Phe,Pro,Ser,Thr,Trp,Tyr,Val,STOP "
-                  "from amino_acids where chromosome = :chrid and position >= :start and position <= :end and (position-:start)%3 = 0;",
-                  {"start": real_start, "chrid": cds_region["chromosome"], "end": cds_region["end"]})
+        if cds_region["strand"] > 0:
+            real_start = cds_region["start"] + carry
+            real_end = cds_region["end"]
+        else:
+            real_start = cds_region["start"]
+            real_end = cds_region["end"] - carry
+        c.execute(sql_protein_table if cds_region["strand"] > 0 else sql_protein_table_rev,
+                  {"start": real_start, "chrid": cds_region["chromosome"], "end": real_end})
         c.execute("select * from protein;")
         counts = c.fetchall()
         for count in counts:
@@ -53,10 +72,10 @@ def prot_consensus(animalid, day, geneid):
                                        count["Met"],count["Phe"],count["Pro"],
                                        count["Ser"],count["Thr"],count["Trp"],
                                        count["Tyr"],count["Val"],count["STOP"]])
-        carry = (3-(cds_region["end"] - real_start + 1)%3)%3
+        carry = (3-(real_end - real_start + 1)%3)%3
         if carry > 0:
             seq = seq[0:-1]+'X'
-        c.execute("drop table protein;")
+        c.execute("DROP TABLE protein;")
     return seq
 
 def write_sample_files(output_dir, samples):
