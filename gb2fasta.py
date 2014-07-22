@@ -40,7 +40,6 @@ except IOError as e:
 for line in gb:
     split = line[:-1].split(',')
     genbank = open(pathname(gb_file) + '/' + split[1])
-    print genbank
     gbrec = SeqIO.read(genbank, "genbank")
     output.write(fasta(split[0], str(gbrec.seq)))
     genbank.close()
