@@ -12,6 +12,7 @@
 #include <bam/sam.h>
 #include <bam/bam.h>
 
+#include "utils.h"
 #include "errors.h"
 
 char sql_select_chrid[] = "SELECT id FROM chromosomes WHERE name = ?;";
@@ -181,21 +182,6 @@ void sql_error(char **errormessage)
      }
 }
 
-void sqlite3_step_onerow(sqlite3_stmt *stmt)
-{
-     int res_code;
-     res_code = sqlite3_step(stmt);
-     if (res_code == SQLITE_DONE) {
-          fprintf(stderr, "No rows returned for query: %s\n",
-                  sqlite3_sql(stmt));
-     }
-     if (res_code != SQLITE_ROW) {
-          fprintf(stderr, "SQLite3 error: %d (%s)\n",
-                  res_code, sqlite3_sql(stmt));
-          exit(SQL_ERROR);
-     }
-}
-
 static int bambasetable[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
 void buffer_insert_read(Buffer *buf, bam1_t *read)
 {
@@ -358,7 +344,7 @@ int main(int argc, char *argv[])
      db_chrids = malloc(n_chr * sizeof(sqlite3_int64));
      memerror(db_chrids);
      sqlite3_prepare_v2(db, sql_select_chrid, sizeof(sql_select_chrid),
-                       &nuc_stmt, NULL);
+                        &nuc_stmt, NULL);
      for (i = 0; i < n_chr; i++) {
           sqlite3_bind_text(nuc_stmt, 1, samin->header->target_name[i], -1,
                             SQLITE_STATIC);
