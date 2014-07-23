@@ -87,6 +87,7 @@ def write_sample_files(output_dir, samples):
         out = open(filename, 'w')
         for i in range(len(sample.sequences)):
             out.write(fasta(sample.seqnames[i], sample.sequences[i]))
+        out.close()
 
 def write_sequence_files(output_dir, samples):
     for i in range(len(samples[0].sequences)):
@@ -98,6 +99,7 @@ def write_sequence_files(output_dir, samples):
         for j in range(len(samples)):
             out.write(fasta("{:s}-d{:d}".format(samples[j].animal,samples[j].day),
                             samples[j].sequences[i]))
+        out.close()
 
 Sample = namedtuple("Sample", ["animal", "day", "seqnames", "sequences"])
 
