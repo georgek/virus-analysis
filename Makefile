@@ -1,37 +1,32 @@
-CC = c99
-CFLAGS ?= -pedantic -Wall -O2 -g -I$(HOME)/include -L$(HOME)/lib
+CC = gcc --std=c99
+CPPFLAGS = -I$(HOME)/include
+CFLAGS = -pedantic -Wall -O2 -g
+LDFLAGS = -L$(HOME)/lib
+LDLIBS = -pthread -lsqlite3 -lbam -lz
 
-all: bam2db bam2db2 bam2db3 trim myccs bam-dr bampos2readpos bam2fasta distances
+PROGS = bam2db bam2db2 bam2db3 trim myccs bam-dr bampos2readpos bam2fasta distances
 
-bam2db: bam2db.c
-	$(CC) $(CFLAGS) bam2db.c -o bam2db -lsqlite3
+all: $(PROGS)
 
-bam2db2: bam2db2.c errors.h
-	$(CC) $(CFLAGS) bam2db2.c -o bam2db2 -lsqlite3 -lbam -lz
+bam2db: bam2db.o
 
-bam2db3: bam2db3.c errors.h
-	$(CC) $(CFLAGS) bam2db3.c utils.c -o bam2db3 -lsqlite3 -lbam -lz
+bam2db2: bam2db2.o
 
-trim: trim.c
-	$(CC) $(CFLAGS) trim.c -o trim
+bam2db3: bam2db3.o utils.o
 
-myccs: myccs.c
-	$(CC) $(CFLAGS) -pthread myccs.c -o myccs -lbam -lz
+trim: trim.o
 
-bam-dr:	bam-dr.c
-	$(CC) $(CFLAGS) -pthread bam-dr.c -o bam-dr -lbam -lz
+myccs: myccs.o
 
-bamtest: bamtest.c
-	$(CC) $(CFLAGS) -pthread bamtest.c -o bamtest -lbam -lz
+bam-dr:	bam-dr.o
 
-bampos2readpos: bampos2readpos.c
-	$(CC) $(CFLAGS) -pthread bampos2readpos.c -o bampos2readpos -lbam -lz
+bamtest: bamtest.o
 
-bam2fasta: bam2fasta.c
-	$(CC) $(CFLAGS) -pthread bam2fasta.c -o bam2fasta -lbam -lz
+bampos2readpos: bampos2readpos.o
 
-distances: distances.c
-	$(CC) $(CFLAGS) distances.c utils.c -o distances -lsqlite3
+bam2fasta: bam2fasta.o
+
+distances: distances.o utils.o
 
 clean:
-	rm -f bam2db bam2db2 bam2db3 trim myccs bam-dr bamtest bampos2readpos
+	rm -f $(PROGS)
