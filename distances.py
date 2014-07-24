@@ -45,7 +45,7 @@ def sequence_distance(seq1, seq2):
     filt1 = map(filter_bias, seq1)
     filt2 = map(filter_bias, seq2)
     dist = sum(map(position_distance, filt1, filt2)) / min(len(filt1), len(filt2))
-    return (-0.74 * math.log(1 - (4.0/3 * dist))) + 0
+    return (-3.0/4 * math.log(1 - (4.0/3 * dist))) + 0
 
 def cat(seqs):
     return reduce(lambda s1,s2: s1 + s2, seqs)
