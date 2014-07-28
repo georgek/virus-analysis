@@ -1,0 +1,42 @@
+* Virus analysis stuff
+
+Some tools that Sergey and I wrote for analysing influenza virus data.
+
+** trim.c
+
+Basic short read trimmer.
+
+** init-db.py
+
+This initialises the sqlite3 database from genbank reference file(s).  The
+tables are contained in db-schema.sql.
+
+** gb2fasta.py
+
+This makes fasta format reference sequences from genbank file(s) for use by
+aligners etc.
+
+** bam2db3.c
+
+This takes an alignment and puts it into a sqlite3 database.
+
+** consensus.py
+
+This extracts various types of consensus sequences from the database and
+outputs fasta files.
+
+** bampos2readpos
+
+Makes the data for the read position graphs for one position in the genome.
+
+** div_plots4.R
+
+Makes the diversity plots from the database.
+
+** vphaser-snps-box.py
+
+Makes the data for the heatmaps from vphaser2 output.
+
+** distances.py
+
+Makes distance matrices between samples from the database
