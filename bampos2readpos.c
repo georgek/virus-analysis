@@ -2,8 +2,6 @@
 #include <stdio.h>
 #include <limits.h>
 
-#include <getopt.h>
-
 #include <bam/bam.h>
 #include <bam/sam.h>
 
