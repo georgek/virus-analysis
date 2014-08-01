@@ -55,8 +55,8 @@ typedef sqlite3_int64 Dels;
 static size_t buffer_init_size = 64;
 typedef struct {
      size_t beg, size;
-     Nucs *fnucs;
-     Nucs *rnucs;
+     /* forward and reverse nuc arrays */
+     Nucs *nucs[2];
      Cods *cods;
      Dels *dels;
 } Buffer;
@@ -65,12 +65,12 @@ int init_buffer(Buffer *buf)
 {
      buf->beg = 0;
      buf->size = buffer_init_size;
-     buf->fnucs = calloc(buffer_init_size, sizeof(Nucs));
-     if (!buf->fnucs) {
+     buf->nucs[0] = calloc(buffer_init_size, sizeof(Nucs));
+     if (!buf->nucs[0]) {
           return -1;
      }
-     buf->rnucs = calloc(buffer_init_size, sizeof(Nucs));
-     if (!buf->rnucs) {
+     buf->nucs[1] = calloc(buffer_init_size, sizeof(Nucs));
+     if (!buf->nucs[1]) {
           return -1;
      }
      buf->cods = calloc(buffer_init_size, sizeof(Cods));
@@ -88,8 +88,8 @@ void free_buffer(Buffer *buf)
 {
      buf->beg = 0;
      buf->size = 0;
-     free(buf->fnucs);
-     free(buf->rnucs);
+     free(buf->nucs[0]);
+     free(buf->nucs[1]);
      free(buf->cods);
      free(buf->dels);
 }
@@ -101,12 +101,12 @@ int resize_buffer(Buffer *buf, size_t new_size)
      while (buf->size < new_size) {
           buf->size <<= 1;
      }
-     buf->fnucs = realloc(buf->fnucs, buf->size * sizeof(Nucs));
-     if (!buf->fnucs) {
+     buf->nucs[0] = realloc(buf->nucs[0], buf->size * sizeof(Nucs));
+     if (!buf->nucs[0]) {
           return -1;
      }
-     buf->rnucs = realloc(buf->rnucs, buf->size * sizeof(Nucs));
-     if (!buf->rnucs) {
+     buf->nucs[1] = realloc(buf->nucs[1], buf->size * sizeof(Nucs));
+     if (!buf->nucs[1]) {
           return -1;
      }
      buf->cods = realloc(buf->cods, buf->size * sizeof(Cods));
@@ -121,11 +121,11 @@ int resize_buffer(Buffer *buf, size_t new_size)
      if (diff > 0) {
           assert(diff >= old_size);
           /* can use memcpy because size is doubled */
-          memcpy(buf->fnucs + buf->beg + diff,
-                 buf->fnucs + buf->beg,
+          memcpy(buf->nucs[0] + buf->beg + diff,
+                 buf->nucs[0] + buf->beg,
                  (old_size - buf->beg)*sizeof(Nucs));
-          memcpy(buf->rnucs + buf->beg + diff,
-                 buf->rnucs + buf->beg,
+          memcpy(buf->nucs[1] + buf->beg + diff,
+                 buf->nucs[1] + buf->beg,
                  (old_size - buf->beg)*sizeof(Nucs));
           memcpy(buf->cods + buf->beg + diff,
                  buf->cods + buf->beg,
@@ -134,10 +134,10 @@ int resize_buffer(Buffer *buf, size_t new_size)
                  buf->dels + buf->beg,
                  (old_size - buf->beg)*sizeof(Dels));
           /* zero the new bit */
-          memset(buf->fnucs + buf->beg,
+          memset(buf->nucs[0] + buf->beg,
                  0,
                  diff*sizeof(Nucs));
-          memset(buf->rnucs + buf->beg,
+          memset(buf->nucs[1] + buf->beg,
                  0,
                  diff*sizeof(Nucs));
           memset(buf->cods + buf->beg,
@@ -159,8 +159,8 @@ int buffer_index(Buffer *buf, int index)
 
 void buffer_next(Buffer *buf) 
 {
-     memset(buf->fnucs + buf->beg, 0, sizeof(Nucs));
-     memset(buf->rnucs + buf->beg, 0, sizeof(Nucs));
+     memset(buf->nucs[0] + buf->beg, 0, sizeof(Nucs));
+     memset(buf->nucs[1] + buf->beg, 0, sizeof(Nucs));
      memset(buf->cods + buf->beg, 0, sizeof(Cods));
      memset(buf->dels + buf->beg, 0, sizeof(Dels));
      buf->beg = (buf->beg + 1)%buf->size;
@@ -188,12 +188,8 @@ void buffer_insert_read(Buffer *buf, bam1_t *read)
      int buf_pos, seq_pos, cig_pos, cig_len;
      int bambase, bambase1, bambase2;
      Nucs *nucs;
-     if (read->core.flag & BAM_FREVERSE) {
-          nucs = buf->rnucs;
-     }
-     else {
-          nucs = buf->fnucs;
-     }
+
+     nucs = *(buf->nucs + ((read->core.flag & BAM_FREVERSE) >> 4));
      for(buf_pos = 0, seq_pos = 0, cig_pos = 0;
          cig_pos < read->core.n_cigar;
          cig_pos++) {
@@ -242,14 +238,14 @@ int beg_to_db(sqlite3 *db, sqlite3_stmt *nuc_stmt, sqlite3_stmt *cod_stmt,
 
      /* do nucs */
      sqlite3_bind_int64(nuc_stmt, 4, pos + 1);
-     sqlite3_bind_int64(nuc_stmt, 5, buf->fnucs[beg][0]);
-     sqlite3_bind_int64(nuc_stmt, 6, buf->fnucs[beg][1]);
-     sqlite3_bind_int64(nuc_stmt, 7, buf->fnucs[beg][2]);
-     sqlite3_bind_int64(nuc_stmt, 8, buf->fnucs[beg][3]);
-     sqlite3_bind_int64(nuc_stmt, 9, buf->rnucs[beg][0]);
-     sqlite3_bind_int64(nuc_stmt, 10, buf->rnucs[beg][1]);
-     sqlite3_bind_int64(nuc_stmt, 11, buf->rnucs[beg][2]);
-     sqlite3_bind_int64(nuc_stmt, 12, buf->rnucs[beg][3]);
+     sqlite3_bind_int64(nuc_stmt, 5, buf->nucs[0][beg][0]);
+     sqlite3_bind_int64(nuc_stmt, 6, buf->nucs[0][beg][1]);
+     sqlite3_bind_int64(nuc_stmt, 7, buf->nucs[0][beg][2]);
+     sqlite3_bind_int64(nuc_stmt, 8, buf->nucs[0][beg][3]);
+     sqlite3_bind_int64(nuc_stmt, 9, buf->nucs[1][beg][0]);
+     sqlite3_bind_int64(nuc_stmt, 10, buf->nucs[1][beg][1]);
+     sqlite3_bind_int64(nuc_stmt, 11, buf->nucs[1][beg][2]);
+     sqlite3_bind_int64(nuc_stmt, 12, buf->nucs[1][beg][3]);
      sqlite3_bind_int64(nuc_stmt, 13, buf->dels[beg]);
 
      res_code = sqlite3_step(nuc_stmt);
@@ -279,7 +275,6 @@ int flush_to_db(sqlite3 *db, sqlite3_stmt *nuc_stmt, sqlite3_stmt *cod_stmt,
                 int32_t pos, Buffer *buf, int32_t n) 
 {
      for (; n > 0; n--, pos++) {
-          /* printf("pos %d, count %d\n", pos, (int)buf->rnucs[buf->beg][0]); */
           beg_to_db(db, nuc_stmt, cod_stmt, pos, buf);
           buffer_next(buf);
      }
