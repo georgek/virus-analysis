@@ -285,6 +285,7 @@ int main(int argc, char *argv[])
 {
      int i;
 
+     char *progname;
      char *dbname;
      char *bamfilename;
      char *animal;
@@ -294,6 +295,7 @@ int main(int argc, char *argv[])
      sqlite3_stmt *nuc_stmt, *cod_stmt;
      int dbopencode = 0;
      char *errormessage = NULL;
+     int proper_pairs;
 
      samfile_t *samin;
 
@@ -306,16 +308,37 @@ int main(int argc, char *argv[])
      Buffer buf;
      memset(&read, 0, sizeof(bam1_t));
 
-     if (argc < 5) {
-          printf("Usage: %s database bamfile animal day\n", argv[0]);
+     progname = *argv;
+     argv++; argc--;
+
+     proper_pairs = 0;
+     while (argc > 0) {
+          if ('-' == **argv) {
+               switch (*(*argv + 1)) {
+               case 'p':
+                    proper_pairs = 1;
+                    break;
+               default:
+                    fprintf(stderr, "Unknown option: %c\n", *(*argv + 1));
+                    break;
+               }
+               argv++; argc--;
+          }
+          else {
+               break;
+          }
+     }
+
+     if (argc < 4) {
+          printf("Usage: %s [-p] database bamfile animal day\n", progname);
           exit(ARG_ERROR);
      }
      else {
-          fprintf(stderr, "DB name: %s... ", argv[1]);
-          dbname = argv[1];
-          bamfilename = argv[2];
-          animal = argv[3];
-          day = strtoul(argv[4], NULL, 10);
+          fprintf(stderr, "DB name: %s... ", argv[0]);
+          dbname = argv[0];
+          bamfilename = argv[1];
+          animal = argv[2];
+          day = strtoul(argv[3], NULL, 10);
      }
      /* try to open db */
      dbopencode = sqlite3_open(dbname, &db);
@@ -385,7 +408,7 @@ int main(int argc, char *argv[])
 
      read_len = 0;
      while(samread(samin, &read) > 0) {
-          if (!(read.core.flag & BAM_FPROPER_PAIR)) {
+          if (proper_pairs && !(read.core.flag & BAM_FPROPER_PAIR)) {
                continue;
           }
           if (cur_tid < read.core.tid) {
