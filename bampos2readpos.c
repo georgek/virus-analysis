@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 
      pos.n_reads_f = 0;
      pos.n_reads_r = 0;
-     pos.read_positions = calloc(pos.read_length, sizeof(struct pos_nucs));
+     pos.read_positions = calloc(pos.read_length, sizeof(*pos.read_positions));
 
      buf = bam_plbuf_init(&pileup_func, &pos);
      /* disable maximum pileup depth */
