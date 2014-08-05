@@ -53,15 +53,15 @@ typedef sqlite3_int64 Cods[4*4*4];
 typedef sqlite3_int64 Dels;
 
 static size_t buffer_init_size = 64;
-typedef struct {
+struct buffer {
      size_t beg, size;
      /* forward and reverse nuc arrays */
      Nucs *nucs[2];
      Cods *cods;
      Dels *dels;
-} Buffer;
+};
 
-int init_buffer(Buffer *buf)
+int init_buffer(struct buffer *buf)
 {
      buf->beg = 0;
      buf->size = buffer_init_size;
@@ -84,7 +84,7 @@ int init_buffer(Buffer *buf)
      return 0;
 }
 
-void free_buffer(Buffer *buf)
+void free_buffer(struct buffer *buf)
 {
      buf->beg = 0;
      buf->size = 0;
@@ -95,7 +95,7 @@ void free_buffer(Buffer *buf)
 }
 
 /* makes buffer at least as big as new_size */
-int resize_buffer(Buffer *buf, size_t new_size)
+int resize_buffer(struct buffer *buf, size_t new_size)
 {
      size_t old_size = buf->size, diff;
      while (buf->size < new_size) {
@@ -152,12 +152,12 @@ int resize_buffer(Buffer *buf, size_t new_size)
      return 0;
 }
 
-int buffer_index(Buffer *buf, int index)
+int buffer_index(struct buffer *buf, int index)
 {
      return (buf->beg + index)%buf->size;
 }
 
-void buffer_next(Buffer *buf) 
+void buffer_next(struct buffer *buf) 
 {
      memset(buf->nucs[0] + buf->beg, 0, sizeof(Nucs));
      memset(buf->nucs[1] + buf->beg, 0, sizeof(Nucs));
@@ -183,7 +183,7 @@ void sql_error(char **errormessage)
 }
 
 static int bambasetable[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
-void buffer_insert_read(Buffer *buf, bam1_t *read)
+void buffer_insert_read(struct buffer *buf, bam1_t *read)
 {
      int buf_pos, seq_pos, cig_pos, cig_len;
      int bambase, bambase1, bambase2;
@@ -231,7 +231,7 @@ void buffer_insert_read(Buffer *buf, bam1_t *read)
 }
 
 int beg_to_db(sqlite3 *db, sqlite3_stmt *nuc_stmt, sqlite3_stmt *cod_stmt,
-              int32_t pos, Buffer *buf)
+              int32_t pos, struct buffer *buf)
 {
      int i, res_code;
      size_t beg = buf->beg;
@@ -272,7 +272,7 @@ int beg_to_db(sqlite3 *db, sqlite3_stmt *nuc_stmt, sqlite3_stmt *cod_stmt,
 
 /* flush the next n things in buffer */
 int flush_to_db(sqlite3 *db, sqlite3_stmt *nuc_stmt, sqlite3_stmt *cod_stmt,
-                int32_t pos, Buffer *buf, int32_t n) 
+                int32_t pos, struct buffer *buf, int32_t n) 
 {
      for (; n > 0; n--, pos++) {
           beg_to_db(db, nuc_stmt, cod_stmt, pos, buf);
@@ -305,7 +305,7 @@ int main(int argc, char *argv[])
 
      bam1_t read;
      int32_t cur_tid, cur_pos, read_len;
-     Buffer buf;
+     struct buffer buf;
      memset(&read, 0, sizeof(bam1_t));
 
      progname = *argv;

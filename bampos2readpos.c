@@ -7,21 +7,21 @@
 
 #include "errors.h"
 
-typedef struct pos_nucs {
+struct pos_nucs {
      uint32_t forward[4];
      uint32_t reverse[4];
      float qforward[4];
      float qreverse[4];
      float avg_rl_f[4];
      float avg_rl_r[4];
-} PosNucs;
+};
 
-typedef struct pos_data {
+struct pos_data {
      size_t n_reads_f, n_reads_r;
      int32_t genome_position;
      int32_t read_length;
-     PosNucs *read_positions;
-} PosData;
+     struct pos_nucs *read_positions;
+};
 
 static size_t n_fetched = 0;
 static size_t n_pushed = 0;
@@ -42,7 +42,7 @@ static int fetch_func(const bam1_t *b, void *data)
 static int pileup_func(uint32_t tid, uint32_t pos, int n,
                        const bam_pileup1_t *pl, void *data)
 {
-     PosData *p = data;
+     struct pos_data *p = data;
      int i, j;
      uint32_t *nucs;
      float *quals, *rl;
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
      bam_plbuf_t *buf;
      bam1_t *bam_read;
 
-     PosData pos;
+     struct pos_data pos;
 
      progname = *argv;
      argv++; argc--;
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 
      pos.n_reads_f = 0;
      pos.n_reads_r = 0;
-     pos.read_positions = calloc(pos.read_length, sizeof(PosNucs));
+     pos.read_positions = calloc(pos.read_length, sizeof(struct pos_nucs));
 
      buf = bam_plbuf_init(&pileup_func, &pos);
      /* disable maximum pileup depth */
