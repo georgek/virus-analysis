@@ -4,6 +4,11 @@ args
 databaseFile <- args[1]
 outputFileFormat <- args[2]
 titleAddition <- args[3]
+splitLength <- Inf
+
+if (length(args) > 3) {
+    splitLength <- as.integer(args[4])
+}
 
 showgc <- FALSE
 windowlength <- 10
@@ -116,31 +121,65 @@ where chromosome = %d;',
         maxcoverage <- max(unlist(coverages))
         filename <- sprintf(outputFileFormat, animals$name[i], days[j])
         print(filename)
-        pdf(file=filename, height=8, width=(maxlength / 10), onefile=TRUE)
+        pdf(file=filename, height=8, width=(min(splitLength, maxlength) / 10), onefile=TRUE)
 
         ## print plots
         for (k in 1:length(chromids)) {
             if (length(dat.cov[[k]]) == 0) {
                 next
             }
-            c <- ggplot() + scale_fill_manual(values=c(gg_color_hue(8),"#444444"))
-            c <- c + geom_bar(data=dat.cov[[k]], aes(x=pos, y=count, fill=base), stat="identity")
-            c <- c + geom_bar(data=dat.snp[[k]], aes(x=pos, y=count, fill=base), stat="identity")
-            ## c <- c + geom_bar(data=dat.del[[k]], aes(x=pos, y=count), fill="black", stat="identity")
-            c <- c + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]])/2 + 1))
-            ## c <- c + expand_limits(y=c(-maxcoverage,maxcoverage))
-            c <- c + labs(title = sprintf("Diversity in %s day %d, %s segment", animals$name[i], days[j], aliases[k]),
-                          x = "Position", y = "Coverage", fill = "Base")
-            c <- c + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
-            suppressWarnings(print(c))  # ggplot warns about negative bars, but it's ok
-            if (showgc) {
-                gc <- ggplot()
-                gc <- gc + geom_line(data=dat.gc[[k]], aes(x=pos, y=gc))
-                gc <- gc + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]]-windowlength+1)/2 + 1))
-                gc <- gc + labs(title = sprintf("GC content in %s segment", aliases[k]),
-                                x = "Position", y = "GC content")
-                gc <- gc + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
-                print(gc)
+
+            if (splitLength > lengths[[k]]) {
+                nsegs <- 1
+                seglength <- lengths[[k]]
+            } else {
+                nsegs <- ceiling(lengths[[k]]/splitLength)
+                seglength <- floor(lengths[[k]]/nsegs)
+            }
+            print(sprintf("split length: %.0f, nsegs: %d", splitLength, nsegs))
+            start = 1
+            end = seglength
+            for (l in 1:nsegs) {
+                if (l == nsegs) {
+                    seglength <- seglength + 1
+                }
+                print(sprintf("Start: %d, end: %d", start, end))
+                c <- ggplot() + scale_fill_manual(values=c(gg_color_hue(8),"#444444"))
+                seg.cov <- subset(dat.cov[[k]], pos>=start & pos <=end)
+                seg.snp <- subset(dat.snp[[k]], pos>=start & pos <=end)
+                c <- c + geom_bar(data=seg.cov, aes(x=pos, y=count, fill=base), stat="identity")
+                c <- c + geom_bar(data=seg.snp, aes(x=pos, y=count, fill=base), stat="identity")
+                ## c <- c + geom_bar(data=dat.del[[k]], aes(x=pos, y=count), fill="black", stat="identity")
+                ## c <- c + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]])/2 + 1))
+                ## print(sprintf("splitLength: %d, seglength: %d", splitLength, seglength))
+                if (nsegs > 1) {
+                    c <- c + scale_x_continuous(expand=c(0, (splitLength - seglength)/2 + 1),
+                                                breaks=seq(start, end, by = 1))
+                } else {
+                    c <- c + scale_x_continuous(expand=c(0, (maxlength - lengths[[k]])/2 + 1),
+                                                breaks=seq(start, end, by = 1))
+                }
+                ## c <- c + expand_limits(y=c(-maxcoverage,maxcoverage))
+                if (nsegs > 1) {
+                    plottitle <- sprintf("Diversity in %s day %d, %s segment part %d", animals$name[i], days[j], aliases[k], l)
+                } else {
+                    plottitle <- sprintf("Diversity in %s day %d, %s segment", animals$name[i], days[j], aliases[k])
+                }
+                c <- c + labs(title = plottitle,
+                              x = "Position", y = "Coverage", fill = "Base")
+                c <- c + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
+                suppressWarnings(print(c))  # ggplot warns about negative bars, but it's ok
+                if (showgc) {
+                    gc <- ggplot()
+                    gc <- gc + geom_line(data=dat.gc[[k]][start:end,], aes(x=pos, y=gc))
+                    gc <- gc + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]]-windowlength+1)/2 + 1))
+                    gc <- gc + labs(title = sprintf("GC content in %s segment", aliases[k]),
+                                    x = "Position", y = "GC content")
+                    gc <- gc + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
+                    print(gc)
+                }
+                start <- start + seglength
+                end <- end + seglength
             }
         }
         dev.off()
