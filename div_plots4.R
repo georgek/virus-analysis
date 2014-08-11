@@ -171,8 +171,15 @@ where chromosome = %d;',
                 suppressWarnings(print(c))  # ggplot warns about negative bars, but it's ok
                 if (showgc) {
                     gc <- ggplot()
-                    gc <- gc + geom_line(data=dat.gc[[k]][start:end,], aes(x=pos, y=gc))
-                    gc <- gc + scale_x_discrete(expand=c(0, (maxlength-lengths[[k]]-windowlength+1)/2 + 1))
+                    seg.gc <- subset(dat.gc[[k]], pos>=start & pos<=end)
+                    gc <- gc + geom_line(data=seg.gc, aes(x=pos, y=gc))
+                    if (nsegs > 1) {
+                        c <- c + scale_x_continuous(expand=c(0, (splitLength - seglength)/2 + 1),
+                                                    breaks=seq(start, end, by = 1))
+                    } else {
+                        c <- c + scale_x_continuous(expand=c(0, (maxlength - lengths[[k]])/2 + 1),
+                                                    breaks=seq(start, end, by = 1))
+                    }
                     gc <- gc + labs(title = sprintf("GC content in %s segment", aliases[k]),
                                     x = "Position", y = "GC content")
                     gc <- gc + theme(axis.text.x = element_text(size=8,angle=90, hjust=1))
