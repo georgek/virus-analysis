@@ -27,8 +27,8 @@ windows <- function(a, k) {
 
 ## returns list of n colours equally spaced in HSL, like ggplot default
 gg_color_hue <- function(n) {
-    hues = seq(15, 375, length=n+1)
-    hcl(h=hues, l=65, c=100)[1:n]
+    hues = seq(15, 375, length=n+1)[1:n]
+    c(hcl(h=hues, l=60, c=110), hcl(h=hues, l=70, c=90))
 }
 
 library("DBI")
@@ -144,7 +144,7 @@ where chromosome = %d;',
                     seglength <- seglength + 1
                 }
                 print(sprintf("Start: %d, end: %d", start, end))
-                c <- ggplot() + scale_fill_manual(values=c(gg_color_hue(8),"#444444"))
+                c <- ggplot() + scale_fill_manual(values=c(gg_color_hue(4),"#444444"))
                 seg.cov <- subset(dat.cov[[k]], pos>=start & pos <=end)
                 seg.snp <- subset(dat.snp[[k]], pos>=start & pos <=end)
                 c <- c + geom_bar(data=seg.cov, aes(x=pos, y=count, fill=base), stat="identity")
