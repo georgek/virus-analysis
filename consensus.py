@@ -9,19 +9,21 @@ from collections import namedtuple
 import sqlite3
 
 sql_protein_table = """CREATE TEMP TABLE protein AS
-SELECT animal, day, (position-:start)/3+1 AS pos,
+SELECT (position-:start)/3+1 AS pos,
 Ala,Arg,Asn,Asp,Cys,Gln,Glu,Gly,His,Ile,
 Leu,Lys,Met,Phe,Pro,Ser,Thr,Trp,Tyr,Val,STOP
 FROM amino_acids WHERE chromosome = :chrid AND position >= :start AND
-position <= :end AND (position-:start)%3 = 0
+position <= :end AND (position-:start)%3 = 0 AND
+animal = :animal AND day = :day
 ORDER BY pos ASC;"""
 
 sql_protein_table_rev = """CREATE TEMP TABLE protein AS
-SELECT animal, day, (:start-position)/3+1 AS pos,
+SELECT (:start-position)/3+1 AS pos,
 Ala,Arg,Asn,Asp,Cys,Gln,Glu,Gly,His,Ile,
 Leu,Lys,Met,Phe,Pro,Ser,Thr,Trp,Tyr,Val,STOP
 FROM amino_acids_rev WHERE chromosome = :chrid AND position >= :start AND
-position <= :end AND (:start-position)%3 = 0
+position <= :end AND (:start-position)%3 = 0 AND
+animal = :animal AND day = :day
 ORDER BY pos ASC;"""
 
 def fasta(name, seq):
@@ -61,7 +63,8 @@ def prot_consensus(animalid, day, geneid):
             real_start = cds_region["start"]
             real_end = cds_region["end"] - carry
         c.execute(sql_protein_table if cds_region["strand"] > 0 else sql_protein_table_rev,
-                  {"start": real_start, "chrid": cds_region["chromosome"], "end": real_end})
+                  {"start": real_start, "chrid": cds_region["chromosome"], "end": real_end,
+                   "animal": animalid, "day": day})
         c.execute("select * from protein;")
         counts = c.fetchall()
         for count in counts:
