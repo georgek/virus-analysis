@@ -182,7 +182,8 @@ void sql_error(char **errormessage)
      }
 }
 
-static int bambasetable[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3};
+static int bambasetable[] = {-1, 0, 1, -1, 2, -1, -1, -1, 3,
+                             -1, -1, -1, -1, -1, -1, -1};
 void buffer_insert_read(struct buffer *buf, bam1_t *read)
 {
      int buf_pos, seq_pos, cig_pos, cig_len;
@@ -198,13 +199,18 @@ void buffer_insert_read(struct buffer *buf, bam1_t *read)
           case BAM_CMATCH:
                for (; cig_len > 0; cig_len--, buf_pos++, seq_pos++) {
                     bambase = bam1_seqi(bam1_seq(read), seq_pos);
-                    nucs[buffer_index(buf, buf_pos)][bambasetable[bambase]]++;
-                    if (cig_len >= 3) {
-                         bambase1 = bam1_seqi(bam1_seq(read), seq_pos+1);
-                         bambase2 = bam1_seqi(bam1_seq(read), seq_pos+2);
-                         buf->cods[buffer_index(buf, buf_pos)][bambasetable[bambase]*16+
-                                                               bambasetable[bambase1]*4+
-                                                               bambasetable[bambase2]]++;
+                    bambase = bambasetable[bambase];
+                    if (bambase > 0) {
+                         nucs[buffer_index(buf, buf_pos)][bambasetable[bambase]]++;
+                         if (cig_len >= 3) {
+                              bambase1 = bam1_seqi(bam1_seq(read), seq_pos+1);
+                              bambase1 = bambasetable[bambase1];
+                              bambase2 = bam1_seqi(bam1_seq(read), seq_pos+2);
+                              bambase2 = bambasetable[bambase2];
+                              buf->cods[buffer_index(buf, buf_pos)][bambase*16+
+                                                                    bambase1*4+
+                                                                    bambase2]++;
+                         }
                     }
                }
                break;
@@ -408,6 +414,9 @@ int main(int argc, char *argv[])
 
      read_len = 0;
      while(samread(samin, &read) > 0) {
+          if (read.core.flag & BAM_FUNMAP) {
+               continue;
+          }
           if (proper_pairs && !(read.core.flag & BAM_FPROPER_PAIR)) {
                continue;
           }
