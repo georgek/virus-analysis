@@ -200,8 +200,8 @@ void buffer_insert_read(struct buffer *buf, bam1_t *read)
                for (; cig_len > 0; cig_len--, buf_pos++, seq_pos++) {
                     bambase = bam1_seqi(bam1_seq(read), seq_pos);
                     bambase = bambasetable[bambase];
-                    if (bambase > 0) {
-                         nucs[buffer_index(buf, buf_pos)][bambasetable[bambase]]++;
+                    if (bambase >= 0) {
+                         nucs[buffer_index(buf, buf_pos)][bambase]++;
                          if (cig_len >= 3) {
                               bambase1 = bam1_seqi(bam1_seq(read), seq_pos+1);
                               bambase1 = bambasetable[bambase1];
