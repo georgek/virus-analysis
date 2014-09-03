@@ -9,8 +9,7 @@
 
 #include <sqlite3.h>
 
-#include <bam/sam.h>
-#include <bam/bam.h>
+#include <htslib/sam.h>
 
 #include "utils.h"
 #include "errors.h"
@@ -157,7 +156,7 @@ int buffer_index(struct buffer *buf, int index)
      return (buf->beg + index)%buf->size;
 }
 
-void buffer_next(struct buffer *buf) 
+void buffer_next(struct buffer *buf)
 {
      memset(buf->nucs[0] + buf->beg, 0, sizeof(Nucs));
      memset(buf->nucs[1] + buf->beg, 0, sizeof(Nucs));
@@ -194,18 +193,18 @@ void buffer_insert_read(struct buffer *buf, bam1_t *read)
      for(buf_pos = 0, seq_pos = 0, cig_pos = 0;
          cig_pos < read->core.n_cigar;
          cig_pos++) {
-          cig_len = bam1_cigar(read)[cig_pos] >> 4;
-          switch(bam1_cigar(read)[cig_pos] & 0xF) {
+          cig_len = bam_get_cigar(read)[cig_pos] >> 4;
+          switch(bam_get_cigar(read)[cig_pos] & 0xF) {
           case BAM_CMATCH:
                for (; cig_len > 0; cig_len--, buf_pos++, seq_pos++) {
-                    bambase = bam1_seqi(bam1_seq(read), seq_pos);
+                    bambase = bam_seqi(bam_get_seq(read), seq_pos);
                     bambase = bambasetable[bambase];
                     if (bambase >= 0) {
                          nucs[buffer_index(buf, buf_pos)][bambase]++;
                          if (cig_len >= 3) {
-                              bambase1 = bam1_seqi(bam1_seq(read), seq_pos+1);
+                              bambase1 = bam_seqi(bam_get_seq(read), seq_pos+1);
                               bambase1 = bambasetable[bambase1];
-                              bambase2 = bam1_seqi(bam1_seq(read), seq_pos+2);
+                              bambase2 = bam_seqi(bam_get_seq(read), seq_pos+2);
                               bambase2 = bambasetable[bambase2];
                               buf->cods[buffer_index(buf, buf_pos)][bambase*16+
                                                                     bambase1*4+
@@ -278,7 +277,7 @@ int beg_to_db(sqlite3 *db, sqlite3_stmt *nuc_stmt, sqlite3_stmt *cod_stmt,
 
 /* flush the next n things in buffer */
 int flush_to_db(sqlite3 *db, sqlite3_stmt *nuc_stmt, sqlite3_stmt *cod_stmt,
-                int32_t pos, struct buffer *buf, int32_t n) 
+                int32_t pos, struct buffer *buf, int32_t n)
 {
      for (; n > 0; n--, pos++) {
           beg_to_db(db, nuc_stmt, cod_stmt, pos, buf);
@@ -303,7 +302,8 @@ int main(int argc, char *argv[])
      char *errormessage = NULL;
      int proper_pairs;
 
-     samfile_t *samin;
+     samFile *samin;
+     bam_hdr_t *header;
 
      int32_t n_chr;
      sqlite3_int64 *db_chrids = NULL;
@@ -357,20 +357,21 @@ int main(int argc, char *argv[])
      }
 
      /* try to open sam/bam file */
-     samin = samopen(bamfilename, "rb", NULL);
+     samin = sam_open(bamfilename, "rb");
      if (!samin) {
           fprintf(stderr, "Error opening file %s\n", bamfilename);
           exit(BAM_ERROR);
      }
 
      /* get chromosome info */
-     n_chr = samin->header->n_targets;
+     header = bam_hdr_read(samin->fp.bgzf);
+     n_chr = header->n_targets;
      db_chrids = malloc(n_chr * sizeof(sqlite3_int64));
      memerror(db_chrids);
      sqlite3_prepare_v2(db, sql_select_chrid, sizeof(sql_select_chrid),
                         &nuc_stmt, NULL);
      for (i = 0; i < n_chr; i++) {
-          sqlite3_bind_text(nuc_stmt, 1, samin->header->target_name[i], -1,
+          sqlite3_bind_text(nuc_stmt, 1, header->target_name[i], -1,
                             SQLITE_STATIC);
           sqlite3_step_onerow(nuc_stmt);
           db_chrids[i] = sqlite3_column_int64(nuc_stmt, 0);
@@ -413,7 +414,7 @@ int main(int argc, char *argv[])
      init_buffer(&buf);
 
      read_len = 0;
-     while(samread(samin, &read) > 0) {
+     while(bam_read1(samin->fp.bgzf, &read) > 0) {
           if (read.core.flag & BAM_FUNMAP) {
                continue;
           }
@@ -423,7 +424,7 @@ int main(int argc, char *argv[])
           if (cur_tid < read.core.tid) {
                /* flush buffer */
                flush_to_db(db, nuc_stmt, cod_stmt, cur_pos, &buf,
-                           samin->header->target_len[cur_tid] - cur_pos);
+                           header->target_len[cur_tid] - cur_pos);
                cur_tid = read.core.tid;
                sqlite3_bind_int64(nuc_stmt, 3, db_chrids[cur_tid]);
                sqlite3_bind_int64(cod_stmt, 3, db_chrids[cur_tid]);
@@ -435,23 +436,25 @@ int main(int argc, char *argv[])
                cur_pos++;
                buffer_next(&buf);
           }
-          read_len = bam_cigar2qlen(&read.core, bam1_cigar(&read));
+          read_len = bam_cigar2qlen(read.core.n_cigar, bam_get_cigar(&read));
           if (read_len > buf.size) {
                resize_buffer(&buf, read_len);
           }
           buffer_insert_read(&buf, &read);
      }
      flush_to_db(db, nuc_stmt, cod_stmt, cur_pos, &buf,
-                 samin->header->target_len[cur_tid] - cur_pos);
+                 header->target_len[cur_tid] - cur_pos);
 
      sqlite3_exec(db, "COMMIT TRANSACTION;", NULL, NULL, &errormessage);
      sql_error(&errormessage);
      sqlite3_finalize(nuc_stmt);
      sqlite3_finalize(cod_stmt);
 
+     free(read.data);
      free_buffer(&buf);
      free(db_chrids);
-     samclose(samin);
+     bam_hdr_destroy(header);
+     sam_close(samin);
      sqlite3_close(db);
 
      return 0;

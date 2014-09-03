@@ -4,14 +4,11 @@ CFLAGS = -pedantic -Wall -O2 -g
 LDFLAGS = -L$(HOME)/lib
 LDLIBS = -pthread -lsqlite3 -lbam -lz
 
-PROGS = bam2db bam2db2 bam2db3 trim myccs bam-dr bampos2readpos bam2fasta distances
+PROGS = bam2db3 trim myccs bam-dr bampos2readpos bam2fasta distances
 
 all: $(PROGS)
 
-bam2db: bam2db.o
-
-bam2db2: bam2db2.o
-
+bam2db3: LDLIBS = -pthread -lsqlite3 -lhts -lz
 bam2db3: bam2db3.o utils.o
 
 trim: trim.o
