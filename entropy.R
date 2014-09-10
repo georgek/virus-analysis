@@ -51,7 +51,7 @@ db <- dbConnect(dbDriver("SQLite"), dbname=databaseFile)
 animals <- dbGetQuery(db,"select id, name from animals;")
 print(animals$name)
 if (wholestudy) {
-    animals <- animals[1]
+    animals <- data.frame(id=c(1),name=c(1))
 }
 
 for (i in 1:length(animals$id)) {
@@ -83,7 +83,7 @@ for (i in 1:length(animals$id)) {
                 chr <- dbGetQuery(db,sprintf('select position,
 sum(Af) as Af,sum(Cf) as Cf,sum(Gf) as Gf,sum(Tf) as Tf,
 sum(Ar) as Ar,sum(Cr) as Cr,sum(Gr) as Gr,sum(Tr) as Tr,
-sum(Af)+sum(Cf)+sum(Gf)+sum(Tf)+sumf(Ar)+sum(Cr)+sum(Gr)+sum(Tr) as cov
+sum(Af)+sum(Cf)+sum(Gf)+sum(Tf)+sum(Ar)+sum(Cr)+sum(Gr)+sum(Tr) as cov
 from nucleotides where chromosome = %d group by position;',
                                              chromosomes$id[k]))
             } else {
