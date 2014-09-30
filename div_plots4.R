@@ -125,7 +125,7 @@ where chromosome = %d;',
 
         ## print plots
         for (k in 1:length(chromids)) {
-            if (length(dat.cov[[k]]) == 0) {
+            if (nrow(dat.cov[[k]]) == 0) {
                 next
             }
 
