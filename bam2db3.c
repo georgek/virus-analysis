@@ -206,9 +206,11 @@ void buffer_insert_read(struct buffer *buf, bam1_t *read)
                               bambase1 = bambasetable[bambase1];
                               bambase2 = bam_seqi(bam_get_seq(read), seq_pos+2);
                               bambase2 = bambasetable[bambase2];
-                              buf->cods[buffer_index(buf, buf_pos)][bambase*16+
-                                                                    bambase1*4+
-                                                                    bambase2]++;
+                              if (bambase1 >= 0 && bambase2 >= 0){
+                                   buf->cods[buffer_index(buf, buf_pos)][bambase*16+
+                                                                         bambase1*4+
+                                                                         bambase2]++;
+                              }
                          }
                     }
                }
