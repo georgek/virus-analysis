@@ -33,11 +33,19 @@ def fasta(name, seq):
 
 def count_to_char(count):
     "Returns character corresponding to max count of form [a,c,g,t]."
-    return ['A','C','G','T'][count.index(max(count))]
+    if sum(count) > 0:
+        return ['A','C','G','T'][count.index(max(count))]
+    else:
+        return 'N'
 
 def count_to_char_acid(count):
     "Returns character corresponding to max count of form [Ala,Arg,...,Val,STOP]."
-    return ['A','R','N','D','C','Q','E','G','H','I','L','K','M','F','P','S','T','W','Y','V','*'][count.index(max(count))]
+    if sum(count) > 0:
+        return ['A','R','N','D','C','Q','E','G',
+                'H','I','L','K','M','F','P','S',
+                'T','W','Y','V','*'][count.index(max(count))]
+    else:
+        return 'X'
 
 def nuc_consensus(animalid, day, chrid):
     "Returns a nucleotide consensus."
