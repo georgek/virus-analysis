@@ -423,15 +423,15 @@ int main(int argc, char *argv[])
           if (proper_pairs && !(read.core.flag & BAM_FPROPER_PAIR)) {
                continue;
           }
-          if (cur_tid < read.core.tid) {
+          while (cur_tid < read.core.tid) {
                /* flush buffer */
                flush_to_db(db, nuc_stmt, cod_stmt, cur_pos, &buf,
                            header->target_len[cur_tid] - cur_pos);
-               cur_tid = read.core.tid;
+               cur_pos = 0;
+               cur_tid++;
                sqlite3_bind_int64(nuc_stmt, 3, db_chrids[cur_tid]);
                sqlite3_bind_int64(cod_stmt, 3, db_chrids[cur_tid]);
                printf("chr %d\n", cur_tid);
-               cur_pos = read.core.pos;
           }
           while (cur_pos < read.core.pos) {
                beg_to_db(db, nuc_stmt, cod_stmt, cur_pos, &buf);
