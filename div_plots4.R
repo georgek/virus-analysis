@@ -69,6 +69,7 @@ animals <- dbGetQuery(db,"select id,name from animals;")
 for (i in 1:length(animals$id)) {
     days <- dbGetQuery(db,sprintf('select distinct day from nucleotides where animal = %d;', animals$id[i]))$day
     if (length(days) == 0) {
+        print(sprintf("Skipping animal %s.", animals$name[i]))
         next
     }
 
@@ -90,7 +91,8 @@ for (i in 1:length(animals$id)) {
             chr <- dbGetQuery(db, sprintf('select position,Af,Ar,Cf,Cr,Gf,Gr,Tf,Tr,D from div
 where animal = %d and day = %d and chromosome = %d;',
                                           animals$id[i], days[j], chromids[k]))
-            if (length(chr) == 0) {
+            if (nrow(chr) == 0) {
+                lengths[[k]] <- 0
                 next
             }
 
@@ -100,8 +102,8 @@ where animal = %d and day = %d and chromosome = %d;',
             ## convert to long form
             df <-     melt(df,     id.vars=c("pos"), variable.name="base", value.name="count")
             df.del <- melt(df.del, id.vars=c("pos"), variable.name="base", value.name="count")
-            dat.cov[[k]] <- rbind(subset(df, count > 0),df.del)
-            dat.snp[[k]] <- subset(df, count < 0)
+            dat.cov[[k]] <- rbind(subset(df, count >= 0),df.del)
+            dat.snp[[k]] <- subset(df, count <= 0)
             dat.del[[k]] <- df.del
             lengths[[k]] <- max(df$pos) - min(df$pos)
             coverages[[k]] <- max(chr$Af + chr$Cf + chr$Gf + chr$Tf +
@@ -125,7 +127,7 @@ where chromosome = %d;',
 
         ## print plots
         for (k in 1:length(chromids)) {
-            if (nrow(dat.cov[[k]]) == 0) {
+            if (lengths[[k]] == 0) {
                 next
             }
 
