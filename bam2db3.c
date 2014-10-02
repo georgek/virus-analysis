@@ -444,8 +444,15 @@ int main(int argc, char *argv[])
           }
           buffer_insert_read(&buf, &read);
      }
-     flush_to_db(db, nuc_stmt, cod_stmt, cur_pos, &buf,
-                 header->target_len[cur_tid] - cur_pos);
+     do {
+          /* flush buffer */
+          flush_to_db(db, nuc_stmt, cod_stmt, cur_pos, &buf,
+                      header->target_len[cur_tid] - cur_pos);
+          cur_pos = 0;
+          cur_tid++;
+          sqlite3_bind_int64(nuc_stmt, 3, db_chrids[cur_tid]);
+          sqlite3_bind_int64(cod_stmt, 3, db_chrids[cur_tid]);
+     } while (cur_tid < n_chr);
 
      sqlite3_exec(db, "COMMIT TRANSACTION;", NULL, NULL, &errormessage);
      sql_error(&errormessage);
