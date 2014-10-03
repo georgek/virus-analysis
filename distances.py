@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# get consensus sequences from database
+# calculate distance matrices for all samples in database
 
 import sys
 import os.path
