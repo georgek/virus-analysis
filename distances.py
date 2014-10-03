@@ -79,7 +79,7 @@ try:
     animals = c.fetchall()
     for animal in animals:
         c.execute("select distinct day from nucleotides where animal = ? order by day asc;",
-                  str(animal["id"]))
+                  (animal["id"],))
         days = c.fetchall()
         for day in days:
             sample = Sample(animal["name"], int(day["day"]), [], [])
