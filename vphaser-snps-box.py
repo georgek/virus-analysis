@@ -82,19 +82,19 @@ for pos, snpcount in snpcounts.iteritems():
 # print "all hosts:", allhosts
 # print "overall:", len(snpcounts)
 
-print "| ", onehost, " | ", onehostndays, " | ", allhosts, " | ", len(snpcounts), " |"
+# print "| ", onehost, " | ", onehostndays, " | ", allhosts, " | ", len(snpcounts), " |"
 
-# sigcounts = []
-# for pos, snpcount in snpcounts.iteritems():
-#     if snpcount.count(0) < len(samples) - 2:
-#         sigcounts.append((pos,snpcount))
+sigcounts = []
+for pos, snpcount in snpcounts.iteritems():
+    if snpcount.count(0) < len(samples) - 2:
+        sigcounts.append((pos,snpcount))
 
-# sigcounts = sorted(sigcounts,key=lambda(c):map(lambda(x):x>0, c[1]))
-# for i in range(len(samples)):
-#     print("{:s}-d{:s}".format(samples[i][0],samples[i][1])),
-# print
-# for pos,count in sigcounts:
-#     print(pos),
-#     for c in count:
-#         print(c),
-#     print
+sigcounts = sorted(sigcounts,key=lambda(c):map(lambda(x):x>0, c[1]))
+for i in range(len(samples)):
+    print("{:s}-d{:s}".format(samples[i][0],samples[i][1])),
+print
+for pos,count in sigcounts:
+    print(pos),
+    for c in count:
+        print(c),
+    print
