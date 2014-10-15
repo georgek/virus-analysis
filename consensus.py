@@ -57,6 +57,17 @@ def nuc_consensus(animalid, day, chrid):
         seq += count_to_char([count["a"],count["c"],count["g"],count["t"]])
     return seq
 
+def nuc_consensus_all(chrid):
+    "Returns a nucleotide consensus for all animals and days."
+    c.execute("""select sum(A) as A,sum(C) as C,sum(G) as G,sum(T) as T
+    from nucleotides_nd where chromosome = ? group by position order by position asc""",
+              (chrid,))
+    counts = c.fetchall()
+    seq = ""
+    for count in counts:
+        seq += count_to_char([count["a"],count["c"],count["g"],count["t"]])
+    return seq
+
 def prot_consensus(animalid, day, geneid):
     "Returns a protein consensus."
     c.execute("select chromosome, start, end, strand from cds_regions join cds on (cds.id = cds) where gene = ?;", (geneid,))
@@ -173,6 +184,12 @@ try:
                     sample.seqnames.append(gene["product"])
                     sample.sequences.append(prot_consensus(animal["id"], day["day"], gene["id"]))
             samples.append(sample)
+    sample = Sample("all", 0, [], [])
+    if args.seq_type == "nuc":
+        for chromosome in chromosomes:
+            sample.seqnames.append(chromosome["name"])
+            sample.sequences.append(nuc_consensus_all(chromosome["id"]))
+    samples.append(sample)
 
 except sqlite3.DatabaseError as e:
     print "sqlite3 error: {:s} ({:s})".format(e, args.database)
