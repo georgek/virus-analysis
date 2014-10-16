@@ -7,6 +7,7 @@ import sys
 import os.path
 from collections import namedtuple
 import sqlite3
+import argparse
 from Bio import SeqIO
 
 def pathname(path):
@@ -25,13 +26,23 @@ containing the name of the chromosome/segment and filename."""
 
 Segment = namedtuple("Segment", ['name','genbank'])
 
-if len(sys.argv) < 4:
-    print(usage.format(os.path.basename(sys.argv[0])))
-    exit(1)
-else:
-    db_file = sys.argv[1]
-    ss_file = sys.argv[2]
-    gb_file = sys.argv[3]
+# ----- command line parsing -----
+parser = argparse.ArgumentParser(
+    description="Initialise sqlite3 database for analysing virus alignment data.")
+parser.add_argument("database", type=str, help="Name of the database file.")
+parser.add_argument("sample_sheet", type=str, help="Sample sheet CSV file.")
+parser.add_argument("genbank_ref_file", type=str, help="File containing filenames of refs in genbank format.")
+parser.add_argument("-p", "--padding", type=int, default=0,
+                    help="Number of Ns to add to beginning and end of reference.")
+parser.add_argument("-n", "--no-read-counts", action="store_true",
+                    help="Do not count reads.")
+args = parser.parse_args()
+# ----- end command line parsing -----
+
+db_file = args.database
+ss_file = args.sample_sheet
+gb_file = args.genbank_ref_file
+padding = args.padding
 
 if os.path.isfile(db_file):
     exit("File {:s} exists!".format(db_file))
@@ -96,26 +107,28 @@ for line in sample_sheet:
     nreads = 0
     paired = 0
     read_file = columns[2].strip()
-    try:
-        reads = open(read_file)
-        print("Counting reads in %s..." % read_file)
-        for read in reads:
-            nreads += 1
-        reads.close()
-    except IOError as e:
-        exit(e)
-    if len(columns) > 3:
-        nreads2 = 0
-        paired = 1
-        read_file = columns[3].strip()
+    if not args.no_read_counts:
         try:
             reads = open(read_file)
             print("Counting reads in %s..." % read_file)
             for read in reads:
-                nreads2 += 1
-            reads.close()
+                nreads += 1
+                reads.close()
         except IOError as e:
             exit(e)
+    if len(columns) > 3:
+        nreads2 = 0
+        paired = 1
+        read_file = columns[3].strip()
+        if not args.no_read_counts:
+            try:
+                reads = open(read_file)
+                print("Counting reads in %s..." % read_file)
+                for read in reads:
+                    nreads2 += 1
+                    reads.close()
+            except IOError as e:
+                exit(e)
         if nreads != nreads2:
             exit("Paired end reads don't match (%s day %s)." % (animal, day))
     c.execute("insert into read_data values(?,?,?,?)",
@@ -126,7 +139,7 @@ genes = {}
 for segment in segments:
     # print("{:s} = {:d}bp".format(segment.name, len(segment.genbank.seq)))
     c.execute("INSERT INTO chromosomes(name, length) VALUES(?, ?);",
-              (segment.name, len(segment.genbank.seq)))
+              (segment.name, len(segment.genbank.seq) + 2*padding))
     chrid = c.lastrowid
     for feature in segment.genbank.features:
         if feature.type == 'CDS':
@@ -146,7 +159,7 @@ for segment in segments:
             for part in location.parts:
                 # print("{:d},{:d},{:s}".format(part.start+1, part.end, gene))
                 c.execute("INSERT INTO cds_regions(cds, number, strand, start, end) VALUES(?,?,?,?,?);",
-                          (cdsid, number, part.strand, part.start+1, part.end))
+                          (cdsid, number, part.strand, part.start + padding + 1, part.end + padding))
                 number += 1
 
 db.commit()
