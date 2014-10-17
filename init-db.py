@@ -113,7 +113,7 @@ for line in sample_sheet:
             print("Counting reads in %s..." % read_file)
             for read in reads:
                 nreads += 1
-                reads.close()
+            reads.close()
         except IOError as e:
             exit(e)
     if len(columns) > 3:
@@ -126,7 +126,7 @@ for line in sample_sheet:
                 print("Counting reads in %s..." % read_file)
                 for read in reads:
                     nreads2 += 1
-                    reads.close()
+                reads.close()
             except IOError as e:
                 exit(e)
         if nreads != nreads2:
