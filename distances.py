@@ -41,7 +41,10 @@ def position_distance(pos1, pos2):
     else:
         return 0
 
-def sequence_distance(seq1, seq2):
+def sequence_distance(seq1, seq2, beg=None, end=None):
+    if beg and end:
+        seq1 = seq1[beg-1:end]
+        seq2 = seq2[beg-1:end]
     filt1 = map(filter_bias, seq1)
     filt2 = map(filter_bias, seq2)
     dist = sum(map(position_distance, filt1, filt2)) / min(len(filt1), len(filt2))
@@ -57,6 +60,8 @@ parser.add_argument("database", type=str, help="The database file.")
 parser.add_argument("output_dir", type=str, help="Output directory.")
 parser.add_argument("-d", "--delimiters", type=str, dest="delimiter", 
                     default=",", help="Use as delimiter (default ,).")
+parser.add_argument("-c", "--coding-regions-only", action="store_true",
+                    help="Only use the coding regions to calculate distances.")
 
 args = parser.parse_args()
 # ----- end command line parsing -----
@@ -98,6 +103,17 @@ except sqlite3.DatabaseError as e:
 delim = args.delimiter.decode("string_escape")
 for i in range(len(chromosomes)):
     filename = args.output_dir + "/{:s}.dist".format(chromosomes[i]["name"])
+
+    cds_beg = None
+    cds_end = None
+    if args.coding_regions_only:
+        c.execute("""SELECT MIN(start) AS beg, MAX(end) AS end FROM cds_regions
+                     JOIN cds ON cds = cds.id WHERE chromosome = ?;""",
+                  (chromosomes[i]["id"],))
+        cds = c.fetchone()
+        cds_beg = int(cds["beg"])
+        cds_end = int(cds["end"])
+
     if os.path.isfile(filename):
         print "Error, file exists ({:s}).".format(filename)
         exit(1)
@@ -106,7 +122,8 @@ for i in range(len(chromosomes)):
     out.write('\n')
     for sample in samples:
         out.write(delim.join(map(lambda s: str(sequence_distance(sample.sequences[i],
-                                                                 s.sequences[i])),
+                                                                 s.sequences[i],
+                                                                 cds_beg, cds_end)),
                                  samples)))
         out.write('\n')
     out.close()
