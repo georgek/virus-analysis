@@ -45,7 +45,7 @@ genbank_file.close()
 snpcounts = {}
 
 for i in range(len(samples)):
-    sample_filename = vp_dir + "/" + samples[i][0] + "_d" + samples[i][1] + "/" + segments[segn] + ".fdr.var.txt"
+    sample_filename = vp_dir + "/" + samples[i][0] + "-d" + samples[i][1] + "/" + segments[segn] + ".fdr.var.txt"
     if not os.path.isfile(sample_filename): continue
     vp_file = open(sample_filename)
     for line in vp_file:
