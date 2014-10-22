@@ -30,8 +30,31 @@ def filter_bias(pos):
 def euclidean_distance(pos1, pos2):
     return math.sqrt(sum(map(lambda x,y: pow((x-y), 2), pos1, pos2)))
 
+def argmax(list):
+    maxpos = 0
+    maxval = list[0]
+    for i in range(1,len(list)):
+        if list[i] > maxval:
+            maxpos = i
+            maxval = list[i]
+    return maxpos
+
+def remove_insignificant(pos, threshold):
+    total = sum(pos)
+    major = argmax(pos)
+    if total > 0:
+        newpos = list(pos)
+        for i in range(len(pos)):
+            if i != major and float(newpos[i])/total < threshold:
+                newpos[i] = 0
+        return newpos
+    else:
+        return pos
+
 position_distance_threshold = 100
-def position_distance(pos1, pos2):
+def position_distance(pos1, pos2, threshold=0.0):
+    pos1 = remove_insignificant(pos1, threshold)
+    pos2 = remove_insignificant(pos2, threshold)
     sum1 = sum(pos1)
     sum2 = sum(pos2)
     if sum1 > position_distance_threshold and sum2 > position_distance_threshold:
@@ -41,13 +64,13 @@ def position_distance(pos1, pos2):
     else:
         return 0
 
-def sequence_distance(seq1, seq2, beg=None, end=None):
+def sequence_distance(seq1, seq2, beg=None, end=None, threshold=0.0):
     if beg and end:
         seq1 = seq1[beg-1:end]
         seq2 = seq2[beg-1:end]
     filt1 = map(filter_bias, seq1)
     filt2 = map(filter_bias, seq2)
-    dist = sum(map(position_distance, filt1, filt2)) / min(len(filt1), len(filt2))
+    dist = sum(map(lambda s1,s2: position_distance(s1,s2,threshold), filt1, filt2)) / min(len(filt1), len(filt2))
     return (-3.0/4 * math.log(1 - (4.0/3 * dist))) + 0
 
 def cat(seqs):
@@ -62,6 +85,8 @@ parser.add_argument("-d", "--delimiters", type=str, dest="delimiter",
                     default=",", help="Use as delimiter (default ,).")
 parser.add_argument("-c", "--coding-regions-only", action="store_true",
                     help="Only use the coding regions to calculate distances.")
+parser.add_argument("-t", "--threshold", type=float, dest="threshold",
+                    default=0.0, help="Minor variant threshold.")
 
 args = parser.parse_args()
 # ----- end command line parsing -----
@@ -123,7 +148,8 @@ for i in range(len(chromosomes)):
     for sample in samples:
         out.write(delim.join(map(lambda s: str(sequence_distance(sample.sequences[i],
                                                                  s.sequences[i],
-                                                                 cds_beg, cds_end)),
+                                                                 cds_beg, cds_end,
+                                                                 args.threshold)),
                                  samples)))
         out.write('\n')
     out.close()
@@ -137,7 +163,9 @@ out.write(delim.join(map(lambda s: "{:s}-d{:d}".format(s.animal, s.day), samples
 out.write('\n')
 for sample in samples:
     out.write(delim.join(map(lambda s: str(sequence_distance(cat(sample.sequences),
-                                                             cat(s.sequences))),
+                                                             cat(s.sequences),
+                                                             None, None,
+                                                             args.threshold)),
                              samples)))
     out.write('\n')
 out.close()
