@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o xtrace
+set -o pipefail
+
+usage() {
+  echo "Usage: $0 tools_dir genbank_ref sample_sheet output_dir"
+  exit 1
+}
+
+[[ $# -ne 4 ]] && usage
+
+TOOLS_DIR=$1
+GB_REF=$2
+SAMPLE_SHEET=$3
+OUTPUT_DIR=$4
+
+# trimming
+TRMO_DIR=$HOME/src/Trimmomatic-0.32
+
+mkdir -p ${OUTPUT_DIR}/trimmed
+
+for line in $(cat "${SAMPLE_SHEET}"); do
+  stub=$(echo $line | sed -r 's/^([0-9]+),([0-9]+),.*$/\1_d\2/g')
+
+  bsub -J ${stub} -o trimmmomatic-output/${stub} -q Test128 -n 8 \
+    -R"rusage[mem=1024]" \
+    java -jar ${TRMO_DIR}/trimmomatic-0.32.jar PE \
+    -threads 8 -phred64 \
+    $(dirname ${SAMPLE_SHEET})/${stub}_1.fq \
+    $(dirname ${SAMPLE_SHEET})/${stub}_2.fq \
+    ${stub}_1t.fastq.gz ${stub}_1u.fastq.gz \
+    ${stub}_2t.fastq.gz ${stub}_2u.fastq.gz \
+    ILLUMINACLIP:${TRMO_DIR}/adapters/TruSeq2-PE.fa:2:30:10 \
+    LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+done
+
+# alignment
+
+
+# rmdup, index
+
+
+# coverage table
+for s in $(cat infection-samples ); do
+  echo -ne "| $s | "
+  for i in $(seq 0 7); do
+    echo -ne $(~/code/tools/pileupcvg aln/${s}.bam $i \
+      | ~/code/tools/average.py -a 2 | xargs printf "%.0f") " |"
+  done
+  echo -ne "\n"
+done
+
+# initialise database
+$TOOLS_DIR/init-db.py -p 60 $OUTPUT_DIR/pileup.db $SAMPLE_SHEET $GB_REF
+
+# V-Phaser 2
+
+
+# Clustering/Trees
+
+
+# Variant graphs

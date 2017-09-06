@@ -15,10 +15,10 @@ animaldays=$(echo "$main" | sed -r 's/^F([0-9]+)_d([0-9]+)\.bam$/\1:\2/g' | uniq
 miscnames=$(echo "$misc" | sed -r 's/^(.*)\.bam$/\1/g' | uniq)
 
 for animalday in $animaldays; do
-    a=${animalday%:*}
-    d=${animalday#*:}
-    echo "F${a}_d${d}"
-    $samtoolscmd ${dir}/F${a}_d${d}.bam | ${prog} ${db} F$a $d
+  a=${animalday%:*}
+  d=${animalday#*:}
+  echo "F${a}_d${d}"
+  $samtoolscmd ${dir}/F${a}_d${d}.bam | ${prog} ${db} F$a $d
 done
 
 for name in $miscnames; do

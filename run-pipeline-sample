@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+#BSUB -J virus-sample
+#BSUB -q Test128
+#BSUB -n 1
+#BSUB -o bam2db3-output
+#BSUB -R rusage[mem=256]
+
+set -o errexit
+set -o nounset
+set -o xtrace
+set -o pipefail
+
+usage() {
+  echo "Usage: $0 sample_name"
+  exit 1
+}
+
+[[ $# -ne 1 ]] && usage
+
+stub=$1
+
+# trimming
+mkdir -p trimmed
+java -jar ~/src/Trimmomatic-0.32/trimmomatic-0.32.jar PE -threads 8 -phred64 \
+    ../reads/${stub}_1.fq ../reads/${stub}_2.fq \
+    ${stub}_1t.fastq.gz ${stub}_1u.fastq.gz \
+    ${stub}_2t.fastq.gz ${stub}_2u.fastq.gz \
+    ILLUMINACLIP:/usr/users/ga002/kettlebg/src/Trimmomatic-0.32/adapters/TruSeq2-PE.fa:2:30:10 \
+    LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36
+
+# alignment
+bowtie2 -p 8 --fr --phred64 --n-ceil 60,0.15 --np 0 \
+    -x ../ref-padded/A-Swine-England-195-2009 \
+    -1 ../trimmed/${stub}_1t.fastq.gz \
+    -2 ../trimmed/${stub}_2t.fastq.gz \
+    -U ../trimmed/${stub}_1u.fastq.gz,../trimmed/${stub}_2u.fastq.gz \
+    | samtools view -bS - | samtools sort - ${stub}
+
+# rmdup, index
+mv ${stub}.bam ${stub}.bam.dup
+samtools rmdup ${stub}.bam.dup ${stub}.bam
+samtools index ${stub}.bam
+rm ${stub}.bam.dup
+
+# coverage table
+for s in $(cat infection-samples )
+do
+    echo -ne "| $s | "
+    for i in $(seq 0 7)
+    do
+        echo -ne $(~/code/tools/pileupcvg aln/${s}.bam $i | ~/code/tools/average.py -a 2 | xargs printf "%.0f") " |"
+    done
+    echo -ne "\n"
+done
+
+# V-Phaser 2
+
+
+# Clustering/Trees
+
+
+# Variant graphs
