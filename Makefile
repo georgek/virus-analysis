@@ -8,7 +8,7 @@ PROGS = bam2db3 trim myccs bam-dr bampos2readpos
 
 all: $(PROGS)
 
-bam2db3: LDLIBS = -pthread -lsqlite3 -lhts -lz
+bam2db3: LDLIBS = -pthread -lsqlite3 -l:libhts.a -lz
 bam2db3: bam2db3.o utils.o
 
 trim: trim.o
